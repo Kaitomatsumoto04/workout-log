@@ -63,3 +63,30 @@ function updateExerciseOptions(part) {
 document.getElementById("input-part").addEventListener("change", function () {
   updateExerciseOptions(this.value);
 });
+
+// ===== 種目の追加 =====
+
+document.getElementById("add-exercise").addEventListener("click", function () {
+  const part = document.getElementById("input-part").value;
+
+  // 部位が未選択なら追加できない
+  if (part === "") {
+    alert("先に部位を選んでください");
+    return;
+  }
+
+  // 種目名を入力してもらう
+  const newExercise = prompt("追加する種目名を入力してください");
+
+  // キャンセルや空入力なら何もしない
+  if (newExercise === null || newExercise.trim() === "") {
+    return;
+  }
+
+  // その部位のリストに追加
+  exerciseMaster[part].push(newExercise.trim());
+
+  // プルダウンを作り直して、追加した種目を選択状態にする
+  updateExerciseOptions(part);
+  document.getElementById("input-exercise").value = newExercise.trim();
+});
