@@ -26,3 +26,40 @@ document.getElementById("back-home-1").addEventListener("click", function () {
 document.getElementById("back-home-2").addEventListener("click", function () {
   showScreen("screen-home");
 });
+
+// ===== 部位ごとの種目リスト（種目マスタ） =====
+
+// 部位名をキーに、その部位の種目を配列で持つ
+const exerciseMaster = {
+  "胸": ["ベンチプレス", "ダンベルプレス", "チェストプレス", "腕立て伏せ"],
+  "背中": ["懸垂", "ラットプルダウン", "デッドリフト", "ローイング"],
+  "腹筋": ["クランチ", "プランク", "レッグレイズ"],
+  "腕": ["アームカール", "トライセプスプレスダウン", "ダンベルカール"],
+  "下半身": ["スクワット", "レッグプレス", "レッグエクステンション", "カーフレイズ"]
+};
+
+// 種目プルダウンを、選ばれた部位に合わせて作り直す関数
+function updateExerciseOptions(part) {
+  const select = document.getElementById("input-exercise");
+  select.innerHTML = ""; // いったん中身を空にする
+
+  // 部位が未選択なら案内だけ入れて終了
+  if (part === "") {
+    select.innerHTML = '<option value="">先に部位を選択</option>';
+    return;
+  }
+
+  // その部位の種目を1つずつ <option> にして入れる
+  const list = exerciseMaster[part];
+  list.forEach(function (exercise) {
+    const option = document.createElement("option");
+    option.value = exercise;
+    option.textContent = exercise;
+    select.appendChild(option);
+  });
+}
+
+// 部位が変わったら種目リストを更新
+document.getElementById("input-part").addEventListener("change", function () {
+  updateExerciseOptions(this.value);
+});
