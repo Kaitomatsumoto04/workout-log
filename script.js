@@ -106,3 +106,89 @@ document.getElementById("add-set").addEventListener("click", function () {
   // セット置き場に追加
   document.getElementById("sets-area").appendChild(row);
 });
+
+// ===== 記録の保存・読み込み・表示 =====
+
+// 記録データの配列。起動時に localStorage から読み込む（無ければ空配列）
+let records = JSON.parse(localStorage.getItem("workout-records")) || [];
+
+// 配列を localStorage に保存する関数
+function saveRecords() {
+  localStorage.setItem("workout-records", JSON.stringify(records));
+}
+
+// 履歴一覧を画面に描き直す関数
+function renderHistory() {
+  const list = document.getElementById("history-list");
+  list.innerHTML = ""; // いったん空に
+
+  if (records.length === 0) {
+    list.innerHTML = "<li>まだ記録がありません</li>";
+    return;
+  }
+
+  // 新しい順（日付の降順）に並べてから表示
+  const sorted = records.slice().sort(function (a, b) {
+    return b.date.localeCompare(a.date);
+  });
+
+  sorted.forEach(function (record) {
+    // セットを "60kg×10, 55kg×8" の形の文字列にする
+    const setsText = record.sets.map(function (s) {
+      return s.weight + "kg×" + s.reps;
+    }).join(", ");
+
+    const li = document.createElement("li");
+    li.textContent =
+      record.date + " " + record.part + " " + record.exercise + " " + setsText;
+    list.appendChild(li);
+  });
+}
+
+// 「記録する」ボタン：入力を集めて保存
+document.getElementById("save-record").addEventListener("click", function () {
+  const date = document.getElementById("input-date").value;
+  const part = document.getElementById("input-part").value;
+  const exercise = document.getElementById("input-exercise").value;
+
+  // 入力チェック
+  if (date === "" || part === "" || exercise === "") {
+    alert("日付・部位・種目を入力してください");
+    return;
+  }
+
+  // セット行を集める（重量・回数が両方入っている行だけ採用）
+  const sets = [];
+  document.querySelectorAll("#sets-area .set-row").forEach(function (row) {
+    const weight = row.querySelector(".set-weight").value;
+    const reps = row.querySelector(".set-reps").value;
+    if (weight !== "" && reps !== "") {
+      sets.push({ weight: Number(weight), reps: Number(reps) });
+    }
+  });
+
+  if (sets.length === 0) {
+    alert("セットを1つ以上入力してください");
+    return;
+  }
+
+  // 記録オブジェクトを作る
+  const record = {
+    id: Date.now(),   // 今の時刻を区別用の番号に（削除で使う）
+    date: date,
+    part: part,
+    exercise: exercise,
+    sets: sets
+  };
+
+  // 配列に追加 → 保存 → 一覧を更新
+  records.push(record);
+  saveRecords();
+  renderHistory();
+
+  alert("記録しました");
+  showScreen("screen-home"); // ホームに戻って履歴を確認
+});
+
+// ===== 起動時：保存済みの履歴を表示 =====
+renderHistory();
