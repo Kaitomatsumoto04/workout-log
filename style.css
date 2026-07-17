@@ -108,3 +108,19 @@ button:active { opacity: 0.8; }
 /* 画面切り替え：通常は隠し、active が付いた画面だけ表示 */
 .screen { display: none; }
 .screen.active { display: block; }
+
+/* 履歴の各行を「テキスト｜削除ボタン」の横並びに */
+#history-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+/* 削除ボタンは小さく赤く */
+.delete-button {
+  width: auto;
+  margin-top: 0;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  background: #e53e3e;
+}

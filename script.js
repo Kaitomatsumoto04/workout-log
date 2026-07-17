@@ -118,31 +118,57 @@ function saveRecords() {
 }
 
 // 履歴一覧を画面に描き直す関数
+// 履歴一覧を画面に描き直す関数（削除ボタン付き）
 function renderHistory() {
   const list = document.getElementById("history-list");
-  list.innerHTML = ""; // いったん空に
+  list.innerHTML = "";
 
   if (records.length === 0) {
     list.innerHTML = "<li>まだ記録がありません</li>";
     return;
   }
 
-  // 新しい順（日付の降順）に並べてから表示
   const sorted = records.slice().sort(function (a, b) {
     return b.date.localeCompare(a.date);
   });
 
   sorted.forEach(function (record) {
-    // セットを "60kg×10, 55kg×8" の形の文字列にする
     const setsText = record.sets.map(function (s) {
       return s.weight + "kg×" + s.reps;
     }).join(", ");
 
     const li = document.createElement("li");
-    li.textContent =
+
+    // 記録テキスト部分
+    const span = document.createElement("span");
+    span.textContent =
       record.date + " " + record.part + " " + record.exercise + " " + setsText;
+
+    // 削除ボタン
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "削除";
+    delBtn.className = "delete-button";
+    delBtn.addEventListener("click", function () {
+      deleteRecord(record.id);
+    });
+
+    li.appendChild(span);
+    li.appendChild(delBtn);
     list.appendChild(li);
   });
+}
+
+// 指定idの記録を削除する関数
+function deleteRecord(id) {
+  if (!confirm("この記録を削除しますか？")) {
+    return;
+  }
+  // id が一致しないものだけ残す＝一致するものを消す
+  records = records.filter(function (r) {
+    return r.id !== id;
+  });
+  saveRecords();
+  renderHistory();
 }
 
 // 「記録する」ボタン：入力を集めて保存
