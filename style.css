@@ -1,0 +1,106 @@
+/* 全体のリセットと基本設定 */
+* {
+  box-sizing: border-box;   /* 幅の計算をわかりやすくする定番指定 */
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: sans-serif;
+  background: #f2f4f7;
+  color: #222;
+  /* スマホ画面を想定し、最大幅を制限して中央寄せ（PCでも見やすい） */
+  max-width: 480px;
+  margin: 0 auto;
+  padding-bottom: 40px;
+}
+
+/* 上部の見出しバー */
+header {
+  background: #2b6cb0;
+  color: #fff;
+  padding: 16px;
+  text-align: center;
+  position: sticky;   /* スクロールしても上に貼り付く */
+  top: 0;
+}
+
+main {
+  padding: 16px;
+}
+
+/* 各画面の共通枠 */
+.screen {
+  background: #fff;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+h2 { margin-bottom: 12px; font-size: 1.2rem; }
+h3 { margin: 16px 0 8px; font-size: 1rem; }
+
+/* 履歴リスト */
+#history-list { list-style: none; }
+#history-list li {
+  padding: 10px 8px;
+  border-bottom: 1px solid #eee;
+  font-size: 0.95rem;
+}
+
+/* ラベルと入力欄を縦積みに */
+label {
+  display: block;
+  margin-bottom: 12px;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+/* 入力欄・選択欄を指で押しやすい大きさに */
+input, select {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px;
+  font-size: 1rem;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+/* セット1行（重量 × 回数）を横並びに */
+.set-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.set-row input { margin-top: 0; }
+.set-row span { font-size: 0.9rem; white-space: nowrap; }
+
+/* ボタン全般：大きくタップしやすく */
+button {
+  width: 100%;
+  padding: 14px;
+  font-size: 1rem;
+  border: none;
+  border-radius: 8px;
+  background: #2b6cb0;
+  color: #fff;
+  cursor: pointer;
+  margin-top: 8px;
+}
+button:active { opacity: 0.8; }
+
+/* 補助ボタン（種目追加・セット追加）は控えめに */
+.sub-button { background: #718096; }
+
+/* 戻るボタンは枠線だけ */
+.ghost-button {
+  background: #fff;
+  color: #2b6cb0;
+  border: 1px solid #2b6cb0;
+}
+
+/* ホームの2ボタンを横並び */
+.home-buttons { display: flex; gap: 8px; }
