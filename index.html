@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <!-- スマホで正しい幅で表示するための必須の1行（モバイル対応の要） -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workout - 筋トレ記録</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 画面上部の見出し。全画面で共通 -->
+  <header>
+    <h1>💪 Workout</h1>
+  </header>
+
+  <main>
+
+    <!-- ① ホーム画面：直近の履歴＋各画面へのボタン -->
+    <section id="screen-home" class="screen">
+      <h2>直近の履歴</h2>
+      <ul id="history-list">
+        <!-- ここに記録がJSで差し込まれる（今は見本を仮置き） -->
+        <li>2026-07-17 胸 ベンチプレス 60kg×10, 55kg×8</li>
+        <li>2026-07-15 背中 懸垂 自重×8×3</li>
+      </ul>
+      <div class="home-buttons">
+        <button id="go-record">記録する</button>
+        <button id="go-review">振り返る</button>
+      </div>
+    </section>
+
+    <!-- ② 記録する画面 -->
+    <section id="screen-record" class="screen">
+      <h2>記録する</h2>
+
+      <label>日付
+        <input type="date" id="input-date">
+      </label>
+
+      <label>部位
+        <select id="input-part">
+          <option value="">選択してください</option>
+          <option value="胸">胸</option>
+          <option value="背中">背中</option>
+          <option value="腹筋">腹筋</option>
+          <option value="腕">腕</option>
+          <option value="下半身">下半身</option>
+        </select>
+      </label>
+
+      <label>種目
+        <select id="input-exercise">
+          <option value="">先に部位を選択</option>
+        </select>
+      </label>
+      <button id="add-exercise" class="sub-button">＋ 種目を追加</button>
+
+      <!-- セット入力（重量×回数）が並ぶ場所。JSで行を増やす -->
+      <h3>セット</h3>
+      <div id="sets-area">
+        <div class="set-row">
+          <input type="number" class="set-weight" placeholder="重量kg">
+          <span>kg ×</span>
+          <input type="number" class="set-reps" placeholder="回数">
+          <span>回</span>
+        </div>
+      </div>
+      <button id="add-set" class="sub-button">＋ セットを追加</button>
+
+      <div class="record-buttons">
+        <button id="save-record">記録する</button>
+        <button id="back-home-1" class="ghost-button">ホームに戻る</button>
+      </div>
+    </section>
+
+    <!-- ③ 振り返る画面（第2弾で中身を作る。今は枠だけ） -->
+    <section id="screen-review" class="screen">
+      <h2>振り返る</h2>
+      <p>グラフ機能は第2弾で作ります。</p>
+      <button id="back-home-2" class="ghost-button">ホームに戻る</button>
+    </section>
+
+  </main>
+
+</body>
+</html>
