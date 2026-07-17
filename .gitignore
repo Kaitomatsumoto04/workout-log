@@ -1,0 +1,6 @@
+# OS が作る不要ファイル
+.DS_Store
+Thumbs.db
+
+# エディタ設定
+.vscode/
