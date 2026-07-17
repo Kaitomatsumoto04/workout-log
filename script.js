@@ -90,3 +90,19 @@ document.getElementById("add-exercise").addEventListener("click", function () {
   updateExerciseOptions(part);
   document.getElementById("input-exercise").value = newExercise.trim();
 });
+
+// ===== セット行の追加 =====
+
+document.getElementById("add-set").addEventListener("click", function () {
+  // 新しいセット1行を作る
+  const row = document.createElement("div");
+  row.className = "set-row";
+  row.innerHTML =
+    '<input type="number" class="set-weight" placeholder="重量kg">' +
+    '<span>kg ×</span>' +
+    '<input type="number" class="set-reps" placeholder="回数">' +
+    '<span>回</span>';
+
+  // セット置き場に追加
+  document.getElementById("sets-area").appendChild(row);
+});
