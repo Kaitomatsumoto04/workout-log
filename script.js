@@ -30,13 +30,22 @@ document.getElementById("back-home-2").addEventListener("click", function () {
 // ===== 部位ごとの種目リスト（種目マスタ） =====
 
 // 部位名をキーに、その部位の種目を配列で持つ
-const exerciseMaster = {
+// 初期の種目リスト（何も保存が無いとき使う）
+const defaultMaster = {
   "胸": ["ベンチプレス", "ダンベルプレス", "チェストプレス", "腕立て伏せ"],
   "背中": ["懸垂", "ラットプルダウン", "デッドリフト", "ローイング"],
   "腹筋": ["クランチ", "プランク", "レッグレイズ"],
   "腕": ["アームカール", "トライセプスプレスダウン", "ダンベルカール"],
   "下半身": ["スクワット", "レッグプレス", "レッグエクステンション", "カーフレイズ"]
 };
+
+// 保存済みがあればそれを、無ければ初期リストを使う
+let exerciseMaster = JSON.parse(localStorage.getItem("workout-master")) || defaultMaster;
+
+// 種目マスタを保存する関数
+function saveMaster() {
+  localStorage.setItem("workout-master", JSON.stringify(exerciseMaster));
+}
 
 // 種目プルダウンを、選ばれた部位に合わせて作り直す関数
 function updateExerciseOptions(part) {
@@ -85,6 +94,7 @@ document.getElementById("add-exercise").addEventListener("click", function () {
 
   // その部位のリストに追加
   exerciseMaster[part].push(newExercise.trim());
+  saveMaster(); 
 
   // プルダウンを作り直して、追加した種目を選択状態にする
   updateExerciseOptions(part);
