@@ -1,74 +1,130 @@
-/* 全体のリセットと基本設定 */
+/* ===== 基本設定（Apple風） ===== */
 * {
-  box-sizing: border-box;   /* 幅の計算をわかりやすくする定番指定 */
+  box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root {
+  --blue: #0A84FF;      /* ダーク用systemBlue（少し明るい） */
+  --red: #FF453A;       /* ダーク用systemRed */
+  --bg: #000000;        /* 背景は純黒（OLEDで映える） */
+  --card: #1C1C1E;      /* カード面 */
+  --label: #FFFFFF;
+  --secondary: #8E8E93;
+  --separator: #38383A;
+  --fill: #7878805C;    /* 入力欄の薄い塗り */
 }
 
 body {
-  font-family: sans-serif;
-  background: #f2f4f7;
-  color: #222;
-  /* スマホ画面を想定し、最大幅を制限して中央寄せ（PCでも見やすい） */
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text",
+               "Hiragino Sans", "Helvetica Neue", sans-serif;
+  font-size: 17px;              /* iOSの本文サイズ */
+  line-height: 1.45;
+  letter-spacing: -0.01em;      /* SF Proらしい詰め */
+  background: var(--bg);
+  color: var(--label);
   max-width: 480px;
   margin: 0 auto;
-  padding-bottom: 40px;
+  padding-bottom: calc(40px + env(safe-area-inset-bottom));
 }
 
-/* 上部の見出しバー */
+/* ===== ナビゲーションバー（半透明＋ぼかし） ===== */
 header {
-  background: #2b6cb0;
-  color: #fff;
-  padding: 16px;
-  text-align: center;
-  position: sticky;   /* スクロールしても上に貼り付く */
+  position: sticky;
   top: 0;
+  z-index: 10;
+  padding: 14px 16px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid var(--separator);
+}
+header h1 {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
-main {
-  padding: 16px;
-}
+main { padding: 16px; }
 
-/* 各画面の共通枠 */
+/* ===== 画面（グループ化カード） ===== */
 .screen {
-  background: #fff;
+  display: none;
+  background: var(--card);
   border-radius: 12px;
   padding: 16px;
   margin-bottom: 20px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  border: 0.5px solid rgba(0,0,0,0.04);
+}
+.screen.active { display: block; }
+
+/* 見出し：iOSのセクションヘッダー風（小さく・グレー・大文字寄り） */
+h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--secondary);
+  letter-spacing: 0.02em;
+  margin-bottom: 10px;
+}
+h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--secondary);
+  margin: 20px 0 8px;
 }
 
-h2 { margin-bottom: 12px; font-size: 1.2rem; }
-h3 { margin: 16px 0 8px; font-size: 1rem; }
-
-/* 履歴リスト */
+/* ===== 履歴リスト（グループ化リスト） ===== */
 #history-list { list-style: none; }
 #history-list li {
-  padding: 10px 8px;
-  border-bottom: 1px solid #eee;
-  font-size: 0.95rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  font-size: 15px;
+  border-bottom: 0.5px solid var(--separator);
 }
+#history-list li:last-child { border-bottom: none; }
 
-/* ラベルと入力欄を縦積みに */
+/* ===== 入力欄 ===== */
 label {
   display: block;
-  margin-bottom: 12px;
-  font-weight: bold;
-  font-size: 0.9rem;
+  margin-bottom: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--secondary);
 }
 
-/* 入力欄・選択欄を指で押しやすい大きさに */
 input, select {
   display: block;
   width: 100%;
   margin-top: 6px;
-  padding: 12px;
-  font-size: 1rem;
-  border: 1px solid #ccc;
-  border-radius: 8px;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 17px;
+  color: var(--label);
+  background: var(--fill);
+  border: none;                 /* Appleは枠線を使わず塗りで示す */
+  border-radius: 10px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+input:focus, select:focus {
+  outline: 2px solid var(--blue);
+  outline-offset: -2px;
+}
+/* selectに矢印を付ける（枠線なしのため） */
+select {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path d='M1 1l5 5 5-5' fill='none' stroke='%238E8E93' stroke-width='1.8' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
 }
 
-/* セット1行（重量 × 回数）を横並びに */
+/* セット1行 */
 .set-row {
   display: flex;
   align-items: center;
@@ -76,70 +132,80 @@ input, select {
   margin-bottom: 8px;
 }
 .set-row input { margin-top: 0; }
-.set-row span { font-size: 0.9rem; white-space: nowrap; }
+.set-row span {
+  font-size: 15px;
+  color: var(--secondary);
+  white-space: nowrap;
+}
 
-/* ボタン全般：大きくタップしやすく */
+/* ===== ボタン ===== */
 button {
   width: 100%;
-  padding: 14px;
-  font-size: 1rem;
+  padding: 15px;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   border: none;
-  border-radius: 8px;
-  background: #2b6cb0;
+  border-radius: 12px;
+  background: var(--blue);
   color: #fff;
   cursor: pointer;
-  margin-top: 8px;
+  margin-top: 10px;
+  transition: opacity 0.15s ease, transform 0.1s ease;
 }
-button:active { opacity: 0.8; }
+button:active { opacity: 0.75; transform: scale(0.985); }
 
-/* 補助ボタン（種目追加・セット追加）は控えめに */
-.sub-button { background: #718096; }
+/* 補助ボタン：Appleは「文字だけの青リンク」で軽い操作を示す */
+.sub-button {
+  background: transparent;
+  color: var(--blue);
+  font-weight: 400;
+  padding: 12px;
+}
 
-/* 戻るボタンは枠線だけ */
+/* 戻る系：薄い塗り */
 .ghost-button {
-  background: #fff;
-  color: #2b6cb0;
-  border: 1px solid #2b6cb0;
+  background: var(--fill);
+  color: var(--blue);
 }
 
-/* ホームの2ボタンを横並び */
-.home-buttons { display: flex; gap: 8px; }
+.home-buttons { display: flex; gap: 10px; }
 
-/* 画面切り替え：通常は隠し、active が付いた画面だけ表示 */
-.screen { display: none; }
-.screen.active { display: block; }
-
-/* 履歴の各行を「テキスト｜削除ボタン」の横並びに */
-#history-list li {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-/* 削除ボタンは小さく赤く */
+/* 削除は赤の文字ボタン */
 .delete-button {
   width: auto;
   margin-top: 0;
-  padding: 6px 12px;
-  font-size: 0.85rem;
-  background: #e53e3e;
+  padding: 6px 10px;
+  font-size: 15px;
+  font-weight: 400;
+  background: transparent;
+  color: var(--red);
 }
+
 /* ===== カレンダー ===== */
 .calendar-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-  font-weight: bold;
+  margin-bottom: 10px;
 }
-/* 前月・翌月ボタンは小さく */
+#calendar-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
 .nav-button {
-  width: 40px;
+  width: 44px;                 /* Apple推奨の最小タップ領域44pt */
+  height: 44px;
   margin-top: 0;
-  padding: 6px;
-  font-size: 1.2rem;
+  padding: 0;
+  font-size: 22px;
+  font-weight: 400;
+  background: transparent;
+  color: var(--blue);
 }
-/* 曜日見出しと日付マスを同じ7列グリッドに */
+
 .calendar-weekdays,
 .calendar-days {
   display: grid;
@@ -148,36 +214,50 @@ button:active { opacity: 0.8; }
   text-align: center;
 }
 .calendar-weekdays span {
-  font-size: 0.75rem;
-  color: #666;
-  padding: 4px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--secondary);
+  padding: 6px 0;
 }
-/* 日付1マス */
+
+/* 日付マス：円形（iOSカレンダー風） */
 .calendar-days .day {
-  padding: 8px 0;
-  font-size: 0.9rem;
-  border-radius: 6px;
-  background: #f7fafc;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  border-radius: 50%;
+  background: transparent;
   cursor: pointer;
 }
-/* 記録がある日は色を付ける */
 .calendar-days .day.has-record {
-  background: #2b6cb0;
+  background: var(--blue);
   color: #fff;
-  font-weight: bold;
+  font-weight: 600;
 }
-/* 選択中の日 */
 .calendar-days .day.selected {
-  outline: 2px solid #e53e3e;
+  outline: 2px solid var(--red);
+  outline-offset: -2px;
 }
-/* 空白マス（前月分の埋め合わせ） */
 .calendar-days .empty {
   background: transparent;
   cursor: default;
 }
-/* 選んだ日の記録表示エリア */
+
+/* 選んだ日の詳細 */
 .day-detail {
-  margin-top: 12px;
-  font-size: 0.9rem;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 0.5px solid var(--separator);
+  font-size: 15px;
+  color: var(--label);
   min-height: 1.2em;
+}
+
+/* グラフ画面のメッセージ */
+#review-message {
+  font-size: 15px;
+  color: var(--secondary);
+  margin-top: 10px;
 }
