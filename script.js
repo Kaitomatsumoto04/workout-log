@@ -221,6 +221,7 @@ document.getElementById("save-record").addEventListener("click", function () {
   records.push(record);
   saveRecords();
   renderHistory();
+  renderCalendar(); 
 
   alert("記録しました");
   showScreen("screen-home"); // ホームに戻って履歴を確認
@@ -335,3 +336,116 @@ document.getElementById("show-graph").addEventListener("click", function () {
     }
   });
 });
+// ===== 月カレンダー =====
+
+// 今表示している年月（最初は今月）
+let currentYear = new Date().getFullYear();
+let currentMonth = new Date().getMonth(); // 0=1月, 11=12月
+
+// 日付を "YYYY-MM-DD" の形の文字列にする関数
+// （記録データの date と同じ形にそろえるため）
+function formatDate(year, month, day) {
+  const m = String(month + 1).padStart(2, "0"); // 月は0始まりなので+1、2桁に
+  const d = String(day).padStart(2, "0");
+  return year + "-" + m + "-" + d;
+}
+
+// カレンダーを描く関数
+function renderCalendar() {
+  const title = document.getElementById("calendar-title");
+  const daysArea = document.getElementById("calendar-days");
+
+  // 見出し（例：2026年7月）
+  title.textContent = currentYear + "年" + (currentMonth + 1) + "月";
+
+  // その月の日数（翌月の0日目＝今月の最終日）
+  const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
+  // その月の1日の曜日（0=日曜）
+  const firstWeekday = new Date(currentYear, currentMonth, 1).getDay();
+
+  daysArea.innerHTML = "";
+
+  // 1日の前に空白マスを入れる（曜日をそろえるため）
+  for (let i = 0; i < firstWeekday; i++) {
+    const empty = document.createElement("div");
+    empty.className = "day empty";
+    daysArea.appendChild(empty);
+  }
+
+  // 1日から最終日までマスを作る
+  for (let day = 1; day <= lastDay; day++) {
+    const dateStr = formatDate(currentYear, currentMonth, day);
+
+    const cell = document.createElement("div");
+    cell.className = "day";
+    cell.textContent = day;
+
+    // その日に記録があるか調べる（1件でもあれば true）
+    const hasRecord = records.some(function (r) {
+      return r.date === dateStr;
+    });
+    if (hasRecord) {
+      cell.classList.add("has-record");
+    }
+
+    // マスをタップしたらその日の記録を表示
+    cell.addEventListener("click", function () {
+      showDayDetail(dateStr, cell);
+    });
+
+    daysArea.appendChild(cell);
+  }
+}
+
+// 選んだ日の記録を下に表示する関数
+function showDayDetail(dateStr, cell) {
+  // 選択中の枠線をいったん全部外して、押されたマスだけに付ける
+  document.querySelectorAll("#calendar-days .day").forEach(function (d) {
+    d.classList.remove("selected");
+  });
+  cell.classList.add("selected");
+
+  const detail = document.getElementById("day-detail");
+  const dayRecords = records.filter(function (r) {
+    return r.date === dateStr;
+  });
+
+  if (dayRecords.length === 0) {
+    detail.textContent = dateStr + "：記録なし";
+    return;
+  }
+
+  // その日の記録を文章にする
+  let text = dateStr + "\n";
+  dayRecords.forEach(function (r) {
+    const setsText = r.sets.map(function (s) {
+      return s.weight + "kg×" + s.reps;
+    }).join(", ");
+    text += "・" + r.part + " " + r.exercise + " " + setsText + "\n";
+  });
+
+  detail.textContent = text;
+  detail.style.whiteSpace = "pre-line"; // 改行を反映させる
+}
+
+// 前月・翌月ボタン
+document.getElementById("prev-month").addEventListener("click", function () {
+  currentMonth = currentMonth - 1;
+  if (currentMonth < 0) {       // 1月から戻ったら前年の12月へ
+    currentMonth = 11;
+    currentYear = currentYear - 1;
+  }
+  renderCalendar();
+});
+
+document.getElementById("next-month").addEventListener("click", function () {
+  currentMonth = currentMonth + 1;
+  if (currentMonth > 11) {      // 12月から進んだら翌年の1月へ
+    currentMonth = 0;
+    currentYear = currentYear + 1;
+  }
+  renderCalendar();
+});
+
+// 起動時に描画
+renderCalendar();

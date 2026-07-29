@@ -124,3 +124,60 @@ button:active { opacity: 0.8; }
   font-size: 0.85rem;
   background: #e53e3e;
 }
+/* ===== カレンダー ===== */
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-weight: bold;
+}
+/* 前月・翌月ボタンは小さく */
+.nav-button {
+  width: 40px;
+  margin-top: 0;
+  padding: 6px;
+  font-size: 1.2rem;
+}
+/* 曜日見出しと日付マスを同じ7列グリッドに */
+.calendar-weekdays,
+.calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  text-align: center;
+}
+.calendar-weekdays span {
+  font-size: 0.75rem;
+  color: #666;
+  padding: 4px 0;
+}
+/* 日付1マス */
+.calendar-days .day {
+  padding: 8px 0;
+  font-size: 0.9rem;
+  border-radius: 6px;
+  background: #f7fafc;
+  cursor: pointer;
+}
+/* 記録がある日は色を付ける */
+.calendar-days .day.has-record {
+  background: #2b6cb0;
+  color: #fff;
+  font-weight: bold;
+}
+/* 選択中の日 */
+.calendar-days .day.selected {
+  outline: 2px solid #e53e3e;
+}
+/* 空白マス（前月分の埋め合わせ） */
+.calendar-days .empty {
+  background: transparent;
+  cursor: default;
+}
+/* 選んだ日の記録表示エリア */
+.day-detail {
+  margin-top: 12px;
+  font-size: 0.9rem;
+  min-height: 1.2em;
+}
