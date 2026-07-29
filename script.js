@@ -449,3 +449,33 @@ document.getElementById("next-month").addEventListener("click", function () {
 
 // 起動時に描画
 renderCalendar();
+
+// ===== セットのコピー（最後の1行を複製） =====
+
+document.getElementById("copy-set").addEventListener("click", function () {
+  // 今あるセット行を全部取得
+  const rows = document.querySelectorAll("#sets-area .set-row");
+  const lastRow = rows[rows.length - 1]; // 一番最後の行
+
+  // 最後の行の入力値を読む
+  const weight = lastRow.querySelector(".set-weight").value;
+  const reps = lastRow.querySelector(".set-reps").value;
+
+  if (weight === "" && reps === "") {
+    alert("コピーするセットを入力してください");
+    return;
+  }
+
+  // 新しい行を作り、読んだ値を入れておく
+  const row = document.createElement("div");
+  row.className = "set-row";
+  row.innerHTML =
+    '<input type="number" class="set-weight" placeholder="重量kg">' +
+    '<span>kg ×</span>' +
+    '<input type="number" class="set-reps" placeholder="回数">' +
+    '<span>回</span>';
+  row.querySelector(".set-weight").value = weight;
+  row.querySelector(".set-reps").value = reps;
+
+  document.getElementById("sets-area").appendChild(row);
+});
