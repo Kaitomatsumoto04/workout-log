@@ -129,6 +129,7 @@ function saveRecords() {
 
 // 履歴一覧を画面に描き直す関数
 // 履歴一覧を画面に描き直す関数（削除ボタン付き）
+// 履歴一覧を日付ごとにまとめて描き直す関数
 function renderHistory() {
   const list = document.getElementById("history-list");
   list.innerHTML = "";
@@ -138,32 +139,56 @@ function renderHistory() {
     return;
   }
 
-  const sorted = records.slice().sort(function (a, b) {
-    return b.date.localeCompare(a.date);
+  // ① 日付をキーにして記録をグループ分けする
+  const groups = {};
+  records.forEach(function (record) {
+    // その日付のグループがまだ無ければ空配列を用意
+    if (groups[record.date] === undefined) {
+      groups[record.date] = [];
+    }
+    groups[record.date].push(record);
   });
 
-  sorted.forEach(function (record) {
-    const setsText = record.sets.map(function (s) {
-      return s.weight + "kg×" + s.reps;
-    }).join(", ");
+  // ② 日付の一覧を新しい順に並べる
+  const dates = Object.keys(groups).sort(function (a, b) {
+    return b.localeCompare(a);
+  });
 
+  // ③ 日付ごとに「見出し＋その日の種目リスト」を作る
+  dates.forEach(function (date) {
     const li = document.createElement("li");
+    li.className = "history-group";
 
-    // 記録テキスト部分
-    const span = document.createElement("span");
-    span.textContent =
-      record.date + " " + record.part + " " + record.exercise + " " + setsText;
+    // 日付の見出し
+    const dateHead = document.createElement("div");
+    dateHead.className = "history-date";
+    dateHead.textContent = date;
+    li.appendChild(dateHead);
 
-    // 削除ボタン
-    const delBtn = document.createElement("button");
-    delBtn.textContent = "削除";
-    delBtn.className = "delete-button";
-    delBtn.addEventListener("click", function () {
-      deleteRecord(record.id);
+    // その日の記録を1件ずつ
+    groups[date].forEach(function (record) {
+      const setsText = record.sets.map(function (s) {
+        return s.weight + "kg×" + s.reps;
+      }).join(", ");
+
+      const row = document.createElement("div");
+      row.className = "history-row";
+
+      const span = document.createElement("span");
+      span.textContent = record.part + " " + record.exercise + " " + setsText;
+
+      const delBtn = document.createElement("button");
+      delBtn.textContent = "削除";
+      delBtn.className = "delete-button";
+      delBtn.addEventListener("click", function () {
+        deleteRecord(record.id);
+      });
+
+      row.appendChild(span);
+      row.appendChild(delBtn);
+      li.appendChild(row);
     });
 
-    li.appendChild(span);
-    li.appendChild(delBtn);
     list.appendChild(li);
   });
 }

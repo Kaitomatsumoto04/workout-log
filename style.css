@@ -78,16 +78,31 @@ h3 {
 
 /* ===== 履歴リスト（グループ化リスト） ===== */
 #history-list { list-style: none; }
+/* 履歴：日付ごとのグループ */
 #history-list li {
+  display: block;
+  padding: 12px 0;
+  border-bottom: 0.5px solid var(--separator);
+}
+#history-list li:last-child { border-bottom: none; }
+
+/* 日付の見出し */
+.history-date {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--secondary);
+  margin-bottom: 6px;
+}
+
+/* その日の1種目分の行 */
+.history-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  padding: 12px 0;
   font-size: 15px;
-  border-bottom: 0.5px solid var(--separator);
+  padding: 3px 0;
 }
-#history-list li:last-child { border-bottom: none; }
 
 /* ===== 入力欄 ===== */
 label {
