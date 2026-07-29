@@ -75,14 +75,39 @@
     </section>
 
     <!-- ③ 振り返る画面（第2弾で中身を作る。今は枠だけ） -->
-    <section id="screen-review" class="screen">
+<section id="screen-review" class="screen">
       <h2>振り返る</h2>
-      <p>グラフ機能は第2弾で作ります。</p>
+
+      <label>開始日
+        <input type="date" id="review-from">
+      </label>
+      <label>終了日
+        <input type="date" id="review-to">
+      </label>
+      <label>部位
+        <select id="review-part">
+          <option value="">選択してください</option>
+          <option value="胸">胸</option>
+          <option value="背中">背中</option>
+          <option value="腹筋">腹筋</option>
+          <option value="腕">腕</option>
+          <option value="下半身">下半身</option>
+        </select>
+      </label>
+      <label>種目
+        <select id="review-exercise">
+          <option value="">先に部位を選択</option>
+        </select>
+      </label>
+
+      <button id="show-graph">グラフを表示</button>
+      <p id="review-message"></p>
+      <canvas id="chart"></canvas>
+
       <button id="back-home-2" class="ghost-button">ホームに戻る</button>
     </section>
-
   </main>
-
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script src="script.js"></script>
 </body>
 </html>

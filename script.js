@@ -228,3 +228,110 @@ document.getElementById("save-record").addEventListener("click", function () {
 
 // ===== 起動時：保存済みの履歴を表示 =====
 renderHistory();
+
+// ===== 振り返る画面（グラフ） =====
+
+// 振り返り画面の部位が変わったら、種目リストを更新
+document.getElementById("review-part").addEventListener("change", function () {
+  const part = this.value;
+  const select = document.getElementById("review-exercise");
+  select.innerHTML = "";
+
+  if (part === "") {
+    select.innerHTML = '<option value="">先に部位を選択</option>';
+    return;
+  }
+
+  exerciseMaster[part].forEach(function (exercise) {
+    const option = document.createElement("option");
+    option.value = exercise;
+    option.textContent = exercise;
+    select.appendChild(option);
+  });
+});
+
+// 作ったグラフを覚えておく変数（描き直すとき前のを消すため）
+let chartInstance = null;
+
+// 「グラフを表示」ボタン
+document.getElementById("show-graph").addEventListener("click", function () {
+  const from = document.getElementById("review-from").value;
+  const to = document.getElementById("review-to").value;
+  const part = document.getElementById("review-part").value;
+  const exercise = document.getElementById("review-exercise").value;
+  const message = document.getElementById("review-message");
+
+  if (part === "" || exercise === "") {
+    message.textContent = "部位と種目を選んでください";
+    return;
+  }
+
+  // 条件に合う記録だけを絞り込む
+  const filtered = records.filter(function (r) {
+    if (r.part !== part) return false;
+    if (r.exercise !== exercise) return false;
+    if (from !== "" && r.date < from) return false;  // 開始日より前は除外
+    if (to !== "" && r.date > to) return false;      // 終了日より後は除外
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    message.textContent = "該当する記録がありません";
+    if (chartInstance !== null) {
+      chartInstance.destroy();
+      chartInstance = null;
+    }
+    return;
+  }
+
+  message.textContent = "";
+
+  // 日付の古い順に並べる（グラフは左から右に時間が進む）
+  filtered.sort(function (a, b) {
+    return a.date.localeCompare(b.date);
+  });
+
+  // 横軸（日付）と縦軸（その日の最大重量）のデータを作る
+  const labels = [];
+  const data = [];
+  filtered.forEach(function (r) {
+    // その記録のセットの中で一番重い重量を探す
+    let maxWeight = 0;
+    r.sets.forEach(function (s) {
+      if (s.weight > maxWeight) {
+        maxWeight = s.weight;
+      }
+    });
+    labels.push(r.date);
+    data.push(maxWeight);
+  });
+
+  // 前のグラフが残っていたら消す
+  if (chartInstance !== null) {
+    chartInstance.destroy();
+  }
+
+  // グラフを描く
+  chartInstance = new Chart(document.getElementById("chart"), {
+    type: "line",              // 折れ線グラフ
+    data: {
+      labels: labels,          // 横軸のラベル（日付）
+      datasets: [{
+        label: exercise + " の最大重量(kg)",
+        data: data,            // 縦軸の値
+        borderColor: "#2b6cb0",
+        backgroundColor: "rgba(43,108,176,0.1)",
+        tension: 0.2,          // 線のなめらかさ
+        fill: true
+      }]
+    },
+    options: {
+      scales: {
+        y: {
+          beginAtZero: true,   // 縦軸を0から始める
+          title: { display: true, text: "重量(kg)" }
+        }
+      }
+    }
+  });
+});
