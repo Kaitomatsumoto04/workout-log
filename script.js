@@ -103,8 +103,9 @@ document.getElementById("add-exercise").addEventListener("click", function () {
 
 // ===== セット行の追加 =====
 
-document.getElementById("add-set").addEventListener("click", function () {
-  // 新しいセット1行を作る
+// セット1行分の要素を作って返す関数
+// （追加・コピー・リセットの3か所で使い回す）
+function createSetRow() {
   const row = document.createElement("div");
   row.className = "set-row";
   row.innerHTML =
@@ -112,10 +113,28 @@ document.getElementById("add-set").addEventListener("click", function () {
     '<span>kg ×</span>' +
     '<input type="number" class="set-reps" placeholder="回数">' +
     '<span>回</span>';
+  return row;
+}
 
-  // セット置き場に追加
-  document.getElementById("sets-area").appendChild(row);
+document.getElementById("add-set").addEventListener("click", function () {
+  // 新しいセット1行を作ってセット置き場に追加
+  document.getElementById("sets-area").appendChild(createSetRow());
 });
+
+// ===== 入力フォームを次の記録用にリセットする =====
+
+function resetRecordForm() {
+  // 日付は同じ日に続けて記録することが多いので残す
+  // 部位は「選択してください」に戻す
+  document.getElementById("input-part").value = "";
+  // 種目は部位が未選択なので「先に部位を選択」に戻る
+  updateExerciseOptions("");
+
+  // セット欄を空の1行だけに戻す（前の種目の重量・回数を消す）
+  const setsArea = document.getElementById("sets-area");
+  setsArea.innerHTML = "";
+  setsArea.appendChild(createSetRow());
+}
 
 // ===== 記録の保存・読み込み・表示 =====
 
@@ -246,10 +265,11 @@ document.getElementById("save-record").addEventListener("click", function () {
   records.push(record);
   saveRecords();
   renderHistory();
-  renderCalendar(); 
+  renderCalendar();
+  resetRecordForm(); // 次の種目をすぐ入力できるようフォームを初期化
 
+  // 続けて次の種目を記録できるよう、ホームには戻らず記録画面のままにする
   alert("記録しました");
-  showScreen("screen-home"); // ホームに戻って履歴を確認
 });
 
 // ===== 起動時：保存済みの履歴を表示 =====
@@ -492,13 +512,7 @@ document.getElementById("copy-set").addEventListener("click", function () {
   }
 
   // 新しい行を作り、読んだ値を入れておく
-  const row = document.createElement("div");
-  row.className = "set-row";
-  row.innerHTML =
-    '<input type="number" class="set-weight" placeholder="重量kg">' +
-    '<span>kg ×</span>' +
-    '<input type="number" class="set-reps" placeholder="回数">' +
-    '<span>回</span>';
+  const row = createSetRow();
   row.querySelector(".set-weight").value = weight;
   row.querySelector(".set-reps").value = reps;
 
