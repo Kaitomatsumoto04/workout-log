@@ -185,7 +185,8 @@ button:active { opacity: 0.75; transform: scale(0.985); }
   color: var(--blue);
 }
 
-.home-buttons { display: flex; gap: 10px; }
+/* 「記録する／振り返る」はカレンダー直下。次の見出しとの間に余白をとる */
+.home-buttons { display: flex; gap: 10px; margin-bottom: 20px; }
 
 /* 削除は赤の文字ボタン */
 .delete-button {
