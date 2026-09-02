@@ -5,6 +5,16 @@
   <!-- スマホで正しい幅で表示するための必須の1行（モバイル対応の要） -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Workout - 筋トレ記録</title>
+
+  <!-- PWA：ホーム画面に追加してアプリのように起動するための設定 -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#000000">
+  <!-- iOS用（iOSはmanifestのdisplayを見ないため個別に指定が必要） -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Workout">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
   <link rel="stylesheet" href="style.css">
 </head>
 <body>

@@ -804,3 +804,15 @@ document.getElementById("timer-reset").addEventListener("click", function () {
 
 // 起動時に表示を合わせる
 updateTimerDisplay();
+
+// ===== PWA（ホーム画面に追加してアプリのように起動する） =====
+
+// Service Worker を登録する
+// ※ https か localhost でないと動かない（file:// では登録できない）
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("./sw.js").catch(function (error) {
+      console.log("Service Workerの登録に失敗:", error);
+    });
+  });
+}
