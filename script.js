@@ -12,6 +12,10 @@ function showScreen(screenId) {
 
 // 各ボタンがクリックされたら、対応する画面へ切り替える
 document.getElementById("go-record").addEventListener("click", function () {
+  // カレンダーで日付を選んでいたら、記録画面の日付欄に入れておく
+  if (selectedDate !== "") {
+    document.getElementById("input-date").value = selectedDate;
+  }
   showScreen("screen-record");
 });
 
@@ -387,6 +391,10 @@ document.getElementById("show-graph").addEventListener("click", function () {
 let currentYear = new Date().getFullYear();
 let currentMonth = new Date().getMonth(); // 0=1月, 11=12月
 
+// カレンダーで選んでいる日付（"YYYY-MM-DD"）。未選択なら空文字
+// 「記録する」を押したとき、記録画面の日付欄に引き継ぐために覚えておく
+let selectedDate = "";
+
 // 日付を "YYYY-MM-DD" の形の文字列にする関数
 // （記録データの date と同じ形にそろえるため）
 function formatDate(year, month, day) {
@@ -402,6 +410,9 @@ function renderCalendar() {
 
   // 見出し（例：2026年7月）
   title.textContent = currentYear + "年" + (currentMonth + 1) + "月";
+
+  // 描き直すと選択中の枠線が消えるので、覚えている日付も未選択に戻す
+  selectedDate = "";
 
   // その月の日数（翌月の0日目＝今月の最終日）
   const lastDay = new Date(currentYear, currentMonth + 1, 0).getDate();
@@ -449,6 +460,9 @@ function showDayDetail(dateStr, cell) {
     d.classList.remove("selected");
   });
   cell.classList.add("selected");
+
+  // 選んだ日付を覚えておく（「記録する」で日付欄に引き継ぐ）
+  selectedDate = dateStr;
 
   const detail = document.getElementById("day-detail");
   const dayRecords = records.filter(function (r) {
