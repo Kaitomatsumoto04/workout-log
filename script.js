@@ -40,7 +40,9 @@ const defaultMaster = {
   "背中": ["懸垂", "ラットプルダウン", "デッドリフト", "ローイング"],
   "腹筋": ["クランチ", "プランク", "レッグレイズ"],
   "腕": ["アームカール", "トライセプスプレスダウン", "ダンベルカール"],
-  "下半身": ["スクワット", "レッグプレス", "レッグエクステンション", "カーフレイズ"]
+  "下半身": ["スクワット", "レッグプレス", "レッグエクステンション", "カーフレイズ"],
+  "ランニング": ["屋外ラン", "トレッドミル", "インターバル走"],
+  "HIIT": ["バーピー", "マウンテンクライマー", "縄跳び", "サーキット"]
 };
 
 // 保存済みがあればそれを、無ければ初期リストを使う
@@ -49,6 +51,28 @@ let exerciseMaster = JSON.parse(localStorage.getItem("workout-master")) || defau
 // 種目マスタを保存する関数
 function saveMaster() {
   localStorage.setItem("workout-master", JSON.stringify(exerciseMaster));
+}
+
+// 後から増やした部位は保存済みマスタに入っていないので、初期リストで補う
+// （これが無いと、追加した部位を選んだとき種目リストが取れずエラーになる）
+Object.keys(defaultMaster).forEach(function (part) {
+  if (exerciseMaster[part] === undefined) {
+    exerciseMaster[part] = defaultMaster[part];
+  }
+});
+saveMaster();
+
+// ===== 部位ごとの入力タイプ =====
+
+// weight: 重量kg × 回数 / distance: 走行距離km / time: 時間(分)
+// ここに書かれていない部位はすべて weight 扱い
+const partInputType = {
+  "ランニング": "distance",
+  "HIIT": "time"
+};
+
+function getInputType(part) {
+  return partInputType[part] || "weight";
 }
 
 // 種目プルダウンを、選ばれた部位に合わせて作り直す関数
@@ -63,7 +87,7 @@ function updateExerciseOptions(part) {
   }
 
   // その部位の種目を1つずつ <option> にして入れる
-  const list = exerciseMaster[part];
+  const list = exerciseMaster[part] || [];
   list.forEach(function (exercise) {
     const option = document.createElement("option");
     option.value = exercise;
@@ -75,6 +99,13 @@ function updateExerciseOptions(part) {
 // 部位が変わったら種目リストを更新
 document.getElementById("input-part").addEventListener("change", function () {
   updateExerciseOptions(this.value);
+
+  // 入力の形（重量×回数／距離／時間）が変わるときだけセット欄を作り直す
+  // 同じ形のまま部位だけ変えたときは、入力済みの内容を消さない
+  const setsArea = document.getElementById("sets-area");
+  if (setsArea.dataset.type !== getInputType(this.value)) {
+    renderSetsArea(this.value);
+  }
 });
 
 // ===== 種目の追加 =====
@@ -109,20 +140,57 @@ document.getElementById("add-exercise").addEventListener("click", function () {
 
 // セット1行分の要素を作って返す関数
 // （追加・コピー・リセットの3か所で使い回す）
-function createSetRow() {
+// type によって入力欄の中身が変わる
+function createSetRow(type) {
   const row = document.createElement("div");
   row.className = "set-row";
-  row.innerHTML =
-    '<input type="number" class="set-weight" placeholder="重量kg">' +
-    '<span>kg ×</span>' +
-    '<input type="number" class="set-reps" placeholder="回数">' +
-    '<span>回</span>';
+
+  if (type === "distance") {
+    // ランニング：走行距離だけ入力する
+    row.innerHTML =
+      '<input type="number" step="0.1" class="set-distance" placeholder="距離km">' +
+      '<span>km</span>';
+  } else if (type === "time") {
+    // HIIT：時間（分）だけ入力する
+    row.innerHTML =
+      '<input type="number" class="set-minutes" placeholder="時間">' +
+      '<span>分</span>';
+  } else {
+    // 筋トレ：重量×回数
+    row.innerHTML =
+      '<input type="number" class="set-weight" placeholder="重量kg">' +
+      '<span>kg ×</span>' +
+      '<input type="number" class="set-reps" placeholder="回数">' +
+      '<span>回</span>';
+  }
+
   return row;
 }
 
+// セット欄を、選ばれた部位に合った入力欄1行だけの状態にする
+function renderSetsArea(part) {
+  const type = getInputType(part);
+
+  const setsArea = document.getElementById("sets-area");
+  setsArea.innerHTML = "";
+  setsArea.dataset.type = type; // 今どの形の入力欄が並んでいるかを覚えておく
+  setsArea.appendChild(createSetRow(type));
+
+  // 見出しも入力内容に合わせて変える
+  const heading = document.getElementById("sets-heading");
+  if (type === "distance") {
+    heading.textContent = "距離";
+  } else if (type === "time") {
+    heading.textContent = "時間";
+  } else {
+    heading.textContent = "セット";
+  }
+}
+
 document.getElementById("add-set").addEventListener("click", function () {
-  // 新しいセット1行を作ってセット置き場に追加
-  document.getElementById("sets-area").appendChild(createSetRow());
+  // 今選ばれている部位に合った行を1行追加する
+  const part = document.getElementById("input-part").value;
+  document.getElementById("sets-area").appendChild(createSetRow(getInputType(part)));
 });
 
 // ===== 入力フォームを次の記録用にリセットする =====
@@ -134,16 +202,28 @@ function resetRecordForm() {
   // 種目は部位が未選択なので「先に部位を選択」に戻る
   updateExerciseOptions("");
 
-  // セット欄を空の1行だけに戻す（前の種目の重量・回数を消す）
-  const setsArea = document.getElementById("sets-area");
-  setsArea.innerHTML = "";
-  setsArea.appendChild(createSetRow());
+  // セット欄を空の1行だけに戻す（前の種目の入力を消す）
+  renderSetsArea("");
 }
 
 // ===== 記録の保存・読み込み・表示 =====
 
 // 記録データの配列。起動時に localStorage から読み込む（無ければ空配列）
 let records = JSON.parse(localStorage.getItem("workout-records")) || [];
+
+// セットの中身を表示用の文字列にする関数
+// 例) 60kg×10, 55kg×8 ／ 5km ／ 20分
+function formatSets(sets) {
+  return sets.map(function (s) {
+    if (s.distance !== undefined) {
+      return s.distance + "km";
+    }
+    if (s.minutes !== undefined) {
+      return s.minutes + "分";
+    }
+    return s.weight + "kg×" + s.reps;
+  }).join(", ");
+}
 
 // 配列を localStorage に保存する関数
 function saveRecords() {
@@ -190,9 +270,7 @@ function renderHistory() {
 
     // その日の記録を1件ずつ
     groups[date].forEach(function (record) {
-      const setsText = record.sets.map(function (s) {
-        return s.weight + "kg×" + s.reps;
-      }).join(", ");
+      const setsText = formatSets(record.sets);
 
       const row = document.createElement("div");
       row.className = "history-row";
@@ -241,18 +319,38 @@ document.getElementById("save-record").addEventListener("click", function () {
     return;
   }
 
-  // セット行を集める（重量・回数が両方入っている行だけ採用）
+  // セット行を集める（部位の入力タイプによって集める中身が変わる）
+  const type = getInputType(part);
   const sets = [];
   document.querySelectorAll("#sets-area .set-row").forEach(function (row) {
-    const weight = row.querySelector(".set-weight").value;
-    const reps = row.querySelector(".set-reps").value;
-    if (weight !== "" && reps !== "") {
-      sets.push({ weight: Number(weight), reps: Number(reps) });
+    if (type === "distance") {
+      const distance = row.querySelector(".set-distance").value;
+      if (distance !== "") {
+        sets.push({ distance: Number(distance) });
+      }
+    } else if (type === "time") {
+      const minutes = row.querySelector(".set-minutes").value;
+      if (minutes !== "") {
+        sets.push({ minutes: Number(minutes) });
+      }
+    } else {
+      // 重量・回数が両方入っている行だけ採用
+      const weight = row.querySelector(".set-weight").value;
+      const reps = row.querySelector(".set-reps").value;
+      if (weight !== "" && reps !== "") {
+        sets.push({ weight: Number(weight), reps: Number(reps) });
+      }
     }
   });
 
   if (sets.length === 0) {
-    alert("セットを1つ以上入力してください");
+    if (type === "distance") {
+      alert("距離を1つ以上入力してください");
+    } else if (type === "time") {
+      alert("時間を1つ以上入力してください");
+    } else {
+      alert("セットを1つ以上入力してください");
+    }
     return;
   }
 
@@ -292,7 +390,8 @@ document.getElementById("review-part").addEventListener("change", function () {
     return;
   }
 
-  exerciseMaster[part].forEach(function (exercise) {
+  const list = exerciseMaster[part] || [];
+  list.forEach(function (exercise) {
     const option = document.createElement("option");
     option.value = exercise;
     option.textContent = exercise;
@@ -341,19 +440,36 @@ document.getElementById("show-graph").addEventListener("click", function () {
     return a.date.localeCompare(b.date);
   });
 
-  // 横軸（日付）と縦軸（その日の最大重量）のデータを作る
+  // 縦軸に何を出すかは部位の入力タイプで変える
+  // 筋トレ：その日の最大重量 / ランニング：合計距離 / HIIT：合計時間
+  const type = getInputType(part);
+
+  let datasetLabel = exercise + " の最大重量(kg)";
+  let axisTitle = "重量(kg)";
+  if (type === "distance") {
+    datasetLabel = exercise + " の走行距離(km)";
+    axisTitle = "距離(km)";
+  } else if (type === "time") {
+    datasetLabel = exercise + " の時間(分)";
+    axisTitle = "時間(分)";
+  }
+
+  // 横軸（日付）と縦軸の値のデータを作る
   const labels = [];
   const data = [];
   filtered.forEach(function (r) {
-    // その記録のセットの中で一番重い重量を探す
-    let maxWeight = 0;
+    let value = 0;
     r.sets.forEach(function (s) {
-      if (s.weight > maxWeight) {
-        maxWeight = s.weight;
+      if (type === "distance") {
+        value = value + s.distance;      // 合計する
+      } else if (type === "time") {
+        value = value + s.minutes;       // 合計する
+      } else if (s.weight > value) {
+        value = s.weight;                // 一番重い重量を残す
       }
     });
     labels.push(r.date);
-    data.push(maxWeight);
+    data.push(value);
   });
 
   // 前のグラフが残っていたら消す
@@ -367,7 +483,7 @@ document.getElementById("show-graph").addEventListener("click", function () {
     data: {
       labels: labels,          // 横軸のラベル（日付）
       datasets: [{
-        label: exercise + " の最大重量(kg)",
+        label: datasetLabel,
         data: data,            // 縦軸の値
         borderColor: "#2b6cb0",
         backgroundColor: "rgba(43,108,176,0.1)",
@@ -379,7 +495,7 @@ document.getElementById("show-graph").addEventListener("click", function () {
       scales: {
         y: {
           beginAtZero: true,   // 縦軸を0から始める
-          title: { display: true, text: "重量(kg)" }
+          title: { display: true, text: axisTitle }
         }
       }
     }
@@ -477,9 +593,7 @@ function showDayDetail(dateStr, cell) {
   // その日の記録を文章にする
   let text = dateStr + "\n";
   dayRecords.forEach(function (r) {
-    const setsText = r.sets.map(function (s) {
-      return s.weight + "kg×" + s.reps;
-    }).join(", ");
+    const setsText = formatSets(r.sets);
     text += "・" + r.part + " " + r.exercise + " " + setsText + "\n";
   });
 
@@ -516,19 +630,177 @@ document.getElementById("copy-set").addEventListener("click", function () {
   const rows = document.querySelectorAll("#sets-area .set-row");
   const lastRow = rows[rows.length - 1]; // 一番最後の行
 
-  // 最後の行の入力値を読む
-  const weight = lastRow.querySelector(".set-weight").value;
-  const reps = lastRow.querySelector(".set-reps").value;
+  // 最後の行の入力欄をすべて読む（部位によって入力欄の数が違うため）
+  const lastInputs = lastRow.querySelectorAll("input");
 
-  if (weight === "" && reps === "") {
-    alert("コピーするセットを入力してください");
+  // 全部が空ならコピーしない
+  let hasValue = false;
+  lastInputs.forEach(function (input) {
+    if (input.value !== "") {
+      hasValue = true;
+    }
+  });
+  if (!hasValue) {
+    alert("コピーする内容を入力してください");
     return;
   }
 
-  // 新しい行を作り、読んだ値を入れておく
-  const row = createSetRow();
-  row.querySelector(".set-weight").value = weight;
-  row.querySelector(".set-reps").value = reps;
+  // 同じ形の新しい行を作り、読んだ値を同じ順番で入れておく
+  const part = document.getElementById("input-part").value;
+  const row = createSetRow(getInputType(part));
+  const newInputs = row.querySelectorAll("input");
+  lastInputs.forEach(function (input, i) {
+    newInputs[i].value = input.value;
+  });
 
   document.getElementById("sets-area").appendChild(row);
 });
+
+// ===== インターバルタイマー =====
+
+let timerSeconds = 60;    // セットしている秒数（リセットで戻る値）
+let timerRemaining = 60;  // 残り秒数
+let timerEndTime = 0;     // 終了予定の時刻（ミリ秒）
+let timerId = null;       // setInterval の番号。動いていないときは null
+let audioCtx = null;      // アラーム音を作るための音源
+
+// 秒数を "01:30" の形にする関数
+function formatTime(totalSeconds) {
+  const m = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
+  const s = String(totalSeconds % 60).padStart(2, "0");
+  return m + ":" + s;
+}
+
+// 残り時間の表示を更新する関数
+function updateTimerDisplay() {
+  document.getElementById("timer-display").textContent = formatTime(timerRemaining);
+}
+
+// タイマーを止める関数（一時停止・停止の共通処理）
+function stopTimer() {
+  if (timerId !== null) {
+    clearInterval(timerId); // 動いているタイマーを止める
+    timerId = null;
+  }
+  document.getElementById("timer-start").textContent = "スタート";
+}
+
+// タイマーを開始する関数
+function startTimer() {
+  stopTimer();              // 二重に動き出さないよう、いったん止める
+  if (timerRemaining <= 0) {
+    timerRemaining = timerSeconds; // 0で押されたら最初から
+  }
+
+  // 「終了予定の時刻」を決めて、そこから残りを計算する
+  // （1秒ずつ引く方式だと、裏画面にしたときブラウザが間引いてズレるため）
+  timerEndTime = Date.now() + timerRemaining * 1000;
+  document.getElementById("timer-start").textContent = "一時停止";
+
+  timerId = setInterval(function () {
+    timerRemaining = Math.round((timerEndTime - Date.now()) / 1000);
+
+    if (timerRemaining <= 0) {
+      timerRemaining = 0;
+      updateTimerDisplay();
+      stopTimer();
+      ringAlarm();
+      return;
+    }
+
+    updateTimerDisplay();
+  }, 200); // 表示のズレを小さくするため0.2秒ごとに確認する
+
+  updateTimerDisplay();
+}
+
+// 音を出す準備。ボタンを押した瞬間に呼ぶ
+// （スマホのブラウザは「ユーザー操作のとき」しか音を許可しないため）
+function prepareAudio() {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) {
+    return;
+  }
+  if (audioCtx === null) {
+    audioCtx = new AudioCtx();
+  }
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+}
+
+// アラームを鳴らす関数（音声ファイルを持たず、ブラウザで音を作る）
+function ringAlarm() {
+  // スマホを短く振動させる（対応していない端末では何も起きない）
+  if (navigator.vibrate) {
+    navigator.vibrate([200, 100, 200]);
+  }
+
+  // 画面でも知らせる（数字を赤く点滅）
+  const display = document.getElementById("timer-display");
+  display.classList.add("done");
+  setTimeout(function () {
+    display.classList.remove("done");
+  }, 3000);
+
+  if (audioCtx === null) {
+    return; // 音が用意できていない環境では表示と振動だけ
+  }
+
+  // 「ピッ」を0.35秒おきに3回鳴らす
+  for (let i = 0; i < 3; i++) {
+    const osc = audioCtx.createOscillator();  // 音の波を作る
+    const gain = audioCtx.createGain();       // 音量を調整する
+    const start = audioCtx.currentTime + i * 0.35;
+
+    osc.type = "sine";
+    osc.frequency.value = 880; // ラの音
+
+    // いきなり鳴らすとプツッと鳴るので、音量を短く上げ下げする
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.3, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.25);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(start);
+    osc.stop(start + 0.3);
+  }
+}
+
+// 秒数のプリセットボタン（60秒・90秒・2分・3分）
+document.querySelectorAll(".preset-button").forEach(function (button) {
+  button.addEventListener("click", function () {
+    // 選択中の見た目を付け替える
+    document.querySelectorAll(".preset-button").forEach(function (b) {
+      b.classList.remove("active");
+    });
+    button.classList.add("active");
+
+    stopTimer();
+    timerSeconds = Number(button.dataset.seconds);
+    timerRemaining = timerSeconds;
+    updateTimerDisplay();
+  });
+});
+
+// スタート／一時停止ボタン
+document.getElementById("timer-start").addEventListener("click", function () {
+  prepareAudio(); // 押された瞬間に音の準備をしておく
+
+  if (timerId === null) {
+    startTimer();
+  } else {
+    stopTimer(); // 動いている最中に押されたら一時停止
+  }
+});
+
+// リセットボタン
+document.getElementById("timer-reset").addEventListener("click", function () {
+  stopTimer();
+  timerRemaining = timerSeconds;
+  updateTimerDisplay();
+});
+
+// 起動時に表示を合わせる
+updateTimerDisplay();

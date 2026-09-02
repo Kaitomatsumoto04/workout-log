@@ -11,7 +11,7 @@
 
   <!-- 画面上部の見出し。全画面で共通 -->
   <header>
-    <h1>💪 Workout</h1>
+    <h1>Workout</h1>
   </header>
 
   <main>
@@ -58,6 +58,8 @@
           <option value="腹筋">腹筋</option>
           <option value="腕">腕</option>
           <option value="下半身">下半身</option>
+          <option value="ランニング">ランニング</option>
+          <option value="HIIT">HIIT</option>
         </select>
       </label>
 
@@ -69,8 +71,8 @@
       <button id="add-exercise" class="sub-button">＋ 種目を追加</button>
 
       <!-- セット入力（重量×回数）が並ぶ場所。JSで行を増やす -->
-      <h3>セット</h3>
-      <div id="sets-area">
+      <h3 id="sets-heading">セット</h3>
+      <div id="sets-area" data-type="weight">
         <div class="set-row">
           <input type="number" class="set-weight" placeholder="重量kg">
           <span>kg ×</span>
@@ -80,6 +82,20 @@
       </div>
       <button id="copy-set" class="sub-button">⧉ セットをコピー</button>
       <button id="add-set" class="sub-button">＋ セットを追加</button>
+
+      <!-- インターバルタイマー：セット間の休憩を測り、0でアラームを鳴らす -->
+      <h3>インターバル</h3>
+      <div id="timer-display" class="timer-display">01:00</div>
+      <div class="timer-presets">
+        <button type="button" class="preset-button active" data-seconds="60">60秒</button>
+        <button type="button" class="preset-button" data-seconds="90">90秒</button>
+        <button type="button" class="preset-button" data-seconds="120">2分</button>
+        <button type="button" class="preset-button" data-seconds="180">3分</button>
+      </div>
+      <div class="timer-buttons">
+        <button id="timer-start">スタート</button>
+        <button id="timer-reset" class="ghost-button">リセット</button>
+      </div>
 
       <div class="record-buttons">
         <button id="save-record">記録する</button>
@@ -105,6 +121,8 @@
           <option value="腹筋">腹筋</option>
           <option value="腕">腕</option>
           <option value="下半身">下半身</option>
+          <option value="ランニング">ランニング</option>
+          <option value="HIIT">HIIT</option>
         </select>
       </label>
       <label>種目

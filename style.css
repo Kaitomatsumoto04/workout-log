@@ -30,22 +30,20 @@ body {
   padding-bottom: calc(40px + env(safe-area-inset-bottom));
 }
 
-/* ===== ナビゲーションバー（半透明＋ぼかし） ===== */
+/* ===== ナビゲーションバー（固定せず、スクロールで流れる） ===== */
 header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  padding: 14px 16px;
+  padding: 13px 16px;
+  /* iPhoneのノッチ・ステータスバーに潜り込まないよう上だけ余白を足す */
+  padding-top: calc(13px + env(safe-area-inset-top));
   text-align: center;
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  background: var(--bg);
   border-bottom: 0.5px solid var(--separator);
 }
 header h1 {
-  font-size: 17px;
+  font-size: 22px;              /* iOSのTitle 3相当 */
   font-weight: 600;
   letter-spacing: -0.02em;
+  color: var(--label);
 }
 
 main { padding: 16px; }
@@ -270,6 +268,52 @@ button:active { opacity: 0.75; transform: scale(0.985); }
   color: var(--label);
   min-height: 1.2em;
 }
+
+/* ===== インターバルタイマー ===== */
+
+/* 残り時間の数字。等幅数字にして、カウント中に幅がガタつかないようにする */
+.timer-display {
+  font-size: 56px;
+  font-weight: 300;              /* Appleの時計表示は細め */
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  text-align: center;
+  padding: 8px 0 4px;
+  color: var(--label);
+  transition: color 0.2s ease;
+}
+/* 0になったら赤く点滅させて知らせる */
+.timer-display.done {
+  color: var(--red);
+  animation: timer-flash 0.5s ease-in-out 6;
+}
+@keyframes timer-flash {
+  50% { opacity: 0.25; }
+}
+
+/* 秒数のプリセット（Apple風の小さめピルボタン） */
+.timer-presets {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.preset-button {
+  margin-top: 0;
+  padding: 9px 0;
+  font-size: 15px;
+  font-weight: 400;
+  border-radius: 20px;
+  background: var(--fill);
+  color: var(--blue);
+}
+.preset-button.active {
+  background: var(--blue);
+  color: #fff;
+  font-weight: 600;
+}
+
+.timer-buttons { display: flex; gap: 10px; }
 
 /* グラフ画面のメッセージ */
 #review-message {
