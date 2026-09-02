@@ -186,7 +186,15 @@ button:active { opacity: 0.75; transform: scale(0.985); }
 /* 「記録する／振り返る」はカレンダー直下。次の見出しとの間に余白をとる */
 .home-buttons { display: flex; gap: 10px; margin-bottom: 20px; }
 
-/* 削除は赤の文字ボタン */
+/* 履歴1行の右側に並ぶ操作ボタン */
+.history-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;   /* 記録の文字が長くてもボタンは縮めない */
+}
+
+/* 編集は青、削除は赤の文字ボタン */
+.edit-button,
 .delete-button {
   width: auto;
   margin-top: 0;
@@ -194,8 +202,9 @@ button:active { opacity: 0.75; transform: scale(0.985); }
   font-size: 15px;
   font-weight: 400;
   background: transparent;
-  color: var(--red);
 }
+.edit-button { color: var(--blue); }
+.delete-button { color: var(--red); }
 
 /* ===== カレンダー ===== */
 .calendar-header {

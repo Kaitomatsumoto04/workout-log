@@ -24,6 +24,10 @@ document.getElementById("go-review").addEventListener("click", function () {
 });
 
 document.getElementById("back-home-1").addEventListener("click", function () {
+  // 編集中にホームへ戻ったら、その編集は取りやめる
+  if (editingId !== null) {
+    resetRecordForm();
+  }
   showScreen("screen-home");
 });
 
@@ -167,6 +171,18 @@ function createSetRow(type) {
   return row;
 }
 
+// セット欄の見出しを入力内容に合わせて変える
+function updateSetsHeading(type) {
+  const heading = document.getElementById("sets-heading");
+  if (type === "distance") {
+    heading.textContent = "距離";
+  } else if (type === "time") {
+    heading.textContent = "時間";
+  } else {
+    heading.textContent = "セット";
+  }
+}
+
 // セット欄を、選ばれた部位に合った入力欄1行だけの状態にする
 function renderSetsArea(part) {
   const type = getInputType(part);
@@ -176,15 +192,7 @@ function renderSetsArea(part) {
   setsArea.dataset.type = type; // 今どの形の入力欄が並んでいるかを覚えておく
   setsArea.appendChild(createSetRow(type));
 
-  // 見出しも入力内容に合わせて変える
-  const heading = document.getElementById("sets-heading");
-  if (type === "distance") {
-    heading.textContent = "距離";
-  } else if (type === "time") {
-    heading.textContent = "時間";
-  } else {
-    heading.textContent = "セット";
-  }
+  updateSetsHeading(type);
 }
 
 document.getElementById("add-set").addEventListener("click", function () {
@@ -204,6 +212,74 @@ function resetRecordForm() {
 
   // セット欄を空の1行だけに戻す（前の種目の入力を消す）
   renderSetsArea("");
+
+  // 編集モードだったら新規記録モードに戻す
+  cancelEdit();
+}
+
+// ===== 記録の編集 =====
+
+// 編集中の記録のid。新規記録のときは null
+let editingId = null;
+
+// 編集モードをやめて、新規記録モードの見た目に戻す関数
+function cancelEdit() {
+  editingId = null;
+  document.getElementById("record-heading").textContent = "記録する";
+  document.getElementById("save-record").textContent = "記録する";
+}
+
+// 指定idの記録を記録画面に読み込み、編集モードにする関数
+function startEdit(id) {
+  const record = records.find(function (r) {
+    return r.id === id;
+  });
+  if (record === undefined) {
+    return;
+  }
+
+  editingId = id;
+
+  // 日付・部位を入れる
+  document.getElementById("input-date").value = record.date;
+  document.getElementById("input-part").value = record.part;
+  updateExerciseOptions(record.part);
+
+  // 種目を選ぶ。マスタから消された種目でも選べるよう、無ければ選択肢を足す
+  const select = document.getElementById("input-exercise");
+  select.value = record.exercise;
+  if (select.value !== record.exercise) {
+    const option = document.createElement("option");
+    option.value = record.exercise;
+    option.textContent = record.exercise;
+    select.appendChild(option);
+    select.value = record.exercise;
+  }
+
+  // セット欄を記録の内容で埋める（行数も記録に合わせる）
+  const type = getInputType(record.part);
+  const setsArea = document.getElementById("sets-area");
+  setsArea.innerHTML = "";
+  setsArea.dataset.type = type;
+  record.sets.forEach(function (s) {
+    const row = createSetRow(type);
+    if (type === "distance") {
+      row.querySelector(".set-distance").value = s.distance;
+    } else if (type === "time") {
+      row.querySelector(".set-minutes").value = s.minutes;
+    } else {
+      row.querySelector(".set-weight").value = s.weight;
+      row.querySelector(".set-reps").value = s.reps;
+    }
+    setsArea.appendChild(row);
+  });
+  updateSetsHeading(type);
+
+  // 編集中だと分かるように見出しとボタンの文字を変える
+  document.getElementById("record-heading").textContent = "記録を編集";
+  document.getElementById("save-record").textContent = "更新する";
+
+  showScreen("screen-record");
 }
 
 // ===== 記録の保存・読み込み・表示 =====
@@ -278,6 +354,13 @@ function renderHistory() {
       const span = document.createElement("span");
       span.textContent = record.part + " " + record.exercise + " " + setsText;
 
+      const editBtn = document.createElement("button");
+      editBtn.textContent = "編集";
+      editBtn.className = "edit-button";
+      editBtn.addEventListener("click", function () {
+        startEdit(record.id);
+      });
+
       const delBtn = document.createElement("button");
       delBtn.textContent = "削除";
       delBtn.className = "delete-button";
@@ -285,8 +368,14 @@ function renderHistory() {
         deleteRecord(record.id);
       });
 
+      // ボタン2つは横並びでまとめる
+      const actions = document.createElement("div");
+      actions.className = "history-actions";
+      actions.appendChild(editBtn);
+      actions.appendChild(delBtn);
+
       row.appendChild(span);
-      row.appendChild(delBtn);
+      row.appendChild(actions);
       li.appendChild(row);
     });
 
@@ -303,8 +392,15 @@ function deleteRecord(id) {
   records = records.filter(function (r) {
     return r.id !== id;
   });
+
+  // 編集中の記録が消えたら、編集モードをやめる（更新先が無くなるため）
+  if (editingId === id) {
+    resetRecordForm();
+  }
+
   saveRecords();
   renderHistory();
+  renderCalendar(); // その日の最後の記録を消したらカレンダーの色も消す
 }
 
 // 「記録する」ボタン：入力を集めて保存
@@ -354,24 +450,46 @@ document.getElementById("save-record").addEventListener("click", function () {
     return;
   }
 
-  // 記録オブジェクトを作る
-  const record = {
-    id: Date.now(),   // 今の時刻を区別用の番号に（削除で使う）
-    date: date,
-    part: part,
-    exercise: exercise,
-    sets: sets
-  };
+  // 編集モードかどうかを先に覚えておく（あとでリセットすると消えるため）
+  const isEdit = editingId !== null;
 
-  // 配列に追加 → 保存 → 一覧を更新
-  records.push(record);
+  if (isEdit) {
+    // 編集モード：同じidの記録を上書きする（並び順は変えない）
+    records = records.map(function (r) {
+      if (r.id !== editingId) {
+        return r;
+      }
+      return {
+        id: editingId,  // idは変えない
+        date: date,
+        part: part,
+        exercise: exercise,
+        sets: sets
+      };
+    });
+  } else {
+    // 新規：記録オブジェクトを作って配列に追加
+    records.push({
+      id: Date.now(),   // 今の時刻を区別用の番号に（削除・編集で使う）
+      date: date,
+      part: part,
+      exercise: exercise,
+      sets: sets
+    });
+  }
+
   saveRecords();
   renderHistory();
   renderCalendar();
   resetRecordForm(); // 次の種目をすぐ入力できるようフォームを初期化
 
-  // 続けて次の種目を記録できるよう、ホームには戻らず記録画面のままにする
-  alert("記録しました");
+  if (isEdit) {
+    alert("更新しました");
+    showScreen("screen-home"); // 編集は1件で終わりなのでホームへ戻る
+  } else {
+    // 続けて次の種目を記録できるよう、ホームには戻らず記録画面のままにする
+    alert("記録しました");
+  }
 });
 
 // ===== 起動時：保存済みの履歴を表示 =====
