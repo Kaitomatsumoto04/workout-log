@@ -4,3 +4,8 @@ Thumbs.db
 
 # エディタ設定
 .vscode/
+
+# プッシュ通知サーバー（秘密鍵・ライブラリ・作業用ファイルはコミットしない）
+push-server/node_modules/
+push-server/.dev.vars
+push-server/.wrangler/
