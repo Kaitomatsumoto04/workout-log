@@ -337,10 +337,12 @@ function renderHistory() {
     groups[record.date].push(record);
   });
 
-  // ② 日付の一覧を新しい順に並べる
+  // ② 日付の一覧を新しい順に並べ、記録がある日のうち新しい3日分だけにする
+  // （それより前の記録はカレンダーで見られる）
+  const HISTORY_DAYS = 3;
   const dates = Object.keys(groups).sort(function (a, b) {
     return b.localeCompare(a);
-  });
+  }).slice(0, HISTORY_DAYS);
 
   // ③ 日付ごとに「見出し＋その日の種目リスト」を作る
   dates.forEach(function (date) {
