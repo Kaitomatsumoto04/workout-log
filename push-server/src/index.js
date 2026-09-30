@@ -1,68 +1,103 @@
 import { DurableObject } from "cloudflare:workers";
+import webpush from "web-push";
 
-/**
- * Welcome to Cloudflare Workers! This is your first Durable Objects application.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your Durable Object in action
- * - Run `npm run deploy` to publish your application
- *
- * Learn more at https://developers.cloudflare.com/durable-objects
- */
+// リクエストを受け付けてよいサイト（公開ページと Live Server）
+const ALLOWED_ORIGINS = [
+  "https://kaitomatsumoto04.github.io",
+  "http://127.0.0.1:5500"
+];
 
-/**
- * Env provides a mechanism to reference bindings declared in wrangler.jsonc within JavaScript
- *
- * @typedef {Object} Env
- * @property {DurableObjectNamespace} MY_DURABLE_OBJECT - The Durable Object namespace binding
- */
+// ===== タイマー係（端末1台につき1つ作られる Durable Object） =====
+export class TimerObject extends DurableObject {
+  // タイマーを予約する
+  async start(subscription, endTime) {
+    await this.ctx.storage.put("subscription", subscription); // 通知の宛先を覚えておく
+    await this.ctx.storage.setAlarm(endTime);                 // この時刻に alarm() が呼ばれる
+  }
 
-/** A Durable Object's behavior is defined in an exported Javascript class */
-export class MyDurableObject extends DurableObject {
-	/**
-	 * The constructor is invoked once upon creation of the Durable Object, i.e. the first call to
-	 * 	`DurableObjectStub::get` for a given identifier (no-op constructors can be omitted)
-	 *
-	 * @param {DurableObjectState} ctx - The interface for interacting with Durable Object state
-	 * @param {Env} env - The interface to reference bindings declared in wrangler.jsonc
-	 */
-	constructor(ctx, env) {
-		super(ctx, env);
-	}
+  // 予約を取り消す（一時停止・リセットのとき）
+  async cancel() {
+    await this.ctx.storage.deleteAlarm();
+  }
 
-	/**
-	 * The Durable Object exposes an RPC method sayHello which will be invoked when a Durable
-	 *  Object instance receives a request from a Worker via the same method invocation on the stub
-	 *
-	 * @param {string} name - The name provided to a Durable Object instance from a Worker
-	 * @returns {Promise<string>} The greeting to be sent back to the Worker
-	 */
-	async sayHello(name) {
-		return `Hello, ${name}!`;
-	}
+  // 予約した時刻になると、Cloudflare が自動で呼んでくれる
+  async alarm() {
+    const subscription = await this.ctx.storage.get("subscription");
+    if (!subscription) {
+      return;
+    }
+
+    webpush.setVapidDetails(
+      this.env.VAPID_SUBJECT,
+      this.env.VAPID_PUBLIC_KEY,
+      this.env.VAPID_PRIVATE_KEY
+    );
+    const payload = JSON.stringify({
+      title: "インターバル終了",
+      body: "次のセットを始めましょう"
+    });
+
+    try {
+      // TTL: 届けられなかったとき何秒まで再送を待つか。休憩の通知は遅れて届いても意味がないので短くする
+      await webpush.sendNotification(subscription, payload, { TTL: 60 });
+    } catch (error) {
+      if (error.statusCode === 404 || error.statusCode === 410) {
+        // 宛先が無効になっている（通知をオフにした等）ので忘れる
+        await this.ctx.storage.delete("subscription");
+      } else {
+        console.log("通知の送信に失敗:", error.statusCode, error.body);
+      }
+    }
+  }
+}
+
+// ===== 受付係（Worker） =====
+
+// CORS のヘッダー（別のサイトからのリクエストを許可するための印）
+function corsHeaders(origin) {
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type"
+  };
 }
 
 export default {
-	/**
-	 * This is the standard fetch handler for a Cloudflare Worker
-	 *
-	 * @param {Request} request - The request submitted to the Worker from the client
-	 * @param {Env} env - The interface to reference bindings declared in wrangler.jsonc
-	 * @param {ExecutionContext} ctx - The execution context of the Worker
-	 * @returns {Promise<Response>} The response to be sent back to the client
-	 */
-	async fetch(request, env, ctx) {
-		// Create a stub to open a communication channel with the Durable Object
-		// instance named "foo".
-		//
-		// Requests from all Workers to the Durable Object instance named "foo"
-		// will go to a single remote Durable Object instance.
-		const stub = env.MY_DURABLE_OBJECT.getByName("foo");
+  async fetch(request, env) {
+    const origin = request.headers.get("Origin");
+    if (!ALLOWED_ORIGINS.includes(origin)) {
+      return new Response("Forbidden", { status: 403 });
+    }
+    const headers = corsHeaders(origin);
 
-		// Call the `sayHello()` RPC method on the stub to invoke the method on
-		// the remote Durable Object instance.
-		const greeting = await stub.sayHello("world");
+    // 本番のリクエストの前に、ブラウザが「送ってもいい？」と確認してくる（プリフライト）
+    if (request.method === "OPTIONS") {
+      return new Response(null, { headers });
+    }
+    if (request.method !== "POST") {
+      return new Response("Method Not Allowed", { status: 405, headers });
+    }
 
-		return new Response(greeting);
-	},
+    const data = await request.json();
+    if (!data.subscription || !data.subscription.endpoint) {
+      return new Response("Bad Request", { status: 400, headers });
+    }
+
+    // endpoint（端末ごとに違うURL）を名前にして、その端末専用のタイマー係を呼び出す
+    const timer = env.TIMER.getByName(data.subscription.endpoint);
+    const path = new URL(request.url).pathname;
+
+    if (path === "/start") {
+      if (typeof data.endTime !== "number") {
+        return new Response("Bad Request", { status: 400, headers });
+      }
+      await timer.start(data.subscription, data.endTime);
+    } else if (path === "/cancel") {
+      await timer.cancel();
+    } else {
+      return new Response("Not Found", { status: 404, headers });
+    }
+
+    return new Response("OK", { headers });
+  }
 };

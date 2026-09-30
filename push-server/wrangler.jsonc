@@ -7,10 +7,11 @@
 	"name": "push-server",
 	"main": "src/index.js",
 	"compatibility_date": "2026-09-26",
+	"compatibility_flags": ["nodejs_compat"],
 	"migrations": [
 		{
 			"new_sqlite_classes": [
-				"MyDurableObject"
+				"TimerObject"
 			],
 			"tag": "v1"
 		}
@@ -18,8 +19,8 @@
 	"durable_objects": {
 		"bindings": [
 			{
-				"class_name": "MyDurableObject",
-				"name": "MY_DURABLE_OBJECT"
+				"class_name": "TimerObject",
+				"name": "TIMER"
 			}
 		]
 	},
