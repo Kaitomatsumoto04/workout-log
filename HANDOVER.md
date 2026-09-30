@@ -6,7 +6,7 @@
 
 ## 決定事項
 
-- 技術構成: 素のHTML/CSS/JS（フレームワークなし）、データ保存はlocalStorage
+- 技術構成: 素のHTML/CSS/JS（フレームワークなし）、データ保存は Firestore（ログイン必須。2026-09-30 に localStorage から移行）
 - 公開: GitHub Pages / Public リポジトリ
   - リポジトリ: https://github.com/Kaitomatsumoto04/workout-log
   - 公開URL: https://kaitomatsumoto04.github.io/workout-log/
@@ -17,8 +17,9 @@
 - 画面構成: 1ファイル内の3画面（ホーム／記録する／振り返る）をJSの表示切替で実現
 - データ構造:
   - 記録: `{ id, date, part, exercise, sets: [{weight, reps}] }`
-  - localStorageキー: `workout-records`（記録）/ `workout-master`（部位別種目リスト）
-- 実装済み機能: 画面切替 / 部位→種目連動 / 種目追加 / セット行追加 / セットコピー（最後の1行複製）/ 記録保存 / 履歴表示（日付ごとにグループ化）/ 削除 / 月カレンダー（記録日マーク・日タップで詳細・前月翌月）/ 振り返りグラフ（Chart.js・期間部位種目フィルタ・その日の最大重量を折れ線）/ ランニング・HIIT / インターバルタイマー / PWA化 / 記録の編集 / インターバル終了のプッシュ通知 / バックアップ（JSONの書き出し・読み込み）/ ログイン画面（新規登録・ログイン・ログアウト・パスワード再設定）
+  - Firestore: `users/{uid}` に `master`（部位別種目リスト）、`users/{uid}/records/{記録ID}` に記録1件ずつ（記録IDは作成時刻の `Date.now()` を文字列化）
+  - 旧localStorageキー `workout-records` / `workout-master` は移行後も消さずに予備として残している。`workout-migrated-{uid}` が引っ越し済みの印
+- 実装済み機能: 画面切替 / 部位→種目連動 / 種目追加 / セット行追加 / セットコピー（最後の1行複製）/ 記録保存 / 履歴表示（日付ごとにグループ化）/ 削除 / 月カレンダー（記録日マーク・日タップで詳細・前月翌月）/ 振り返りグラフ（Chart.js・期間部位種目フィルタ・その日の最大重量を折れ線）/ ランニング・HIIT / インターバルタイマー / PWA化 / 記録の編集 / インターバル終了のプッシュ通知 / バックアップ（JSONの書き出し・読み込み）/ ログイン画面（新規登録・ログイン・ログアウト・パスワード再設定）/ Firestore保存（端末間の自動同期・圏外対応・旧データの引っ越し）
 - プッシュ通知の構成:
   - サーバー: Cloudflare Workers + Durable Objects（無料プラン）。コードは `push-server/`
   - 公開URL: https://push-server.kinntore.workers.dev（`POST /start` で予約、`POST /cancel` で取り消し）
@@ -39,7 +40,11 @@
 ## その理由
 
 - フレームワークなし: DOM操作・イベント・状態管理というJSの土台を理解するため。Reactは土台習得後
-- localStorage: サーバー不要で即動き、「保存される達成感」を早く得られる
+- localStorage（初期）: サーバー不要で即動き、「保存される達成感」を早く得られる
+- Firestoreへ移行: 端末を消すと記録が消える問題の解消、複数端末の同期、フレンド機能の土台のため
+- 保存は変わった1件だけ `setDoc` / `deleteDoc`、表示は `onSnapshot` で受け取って描き直す: 描画コードを変えずに済み、ほかの端末の変更も自動で反映される
+- 書き込みを await しない: 圏外では電波が戻るまで完了しないため。端末内コピー（persistentLocalCache）に先に反映される
+- sw.js は自サイトと CDN（jsdelivr / gstatic）だけキャッシュ: Firestore の長時間通信をキャッシュすると壊れるおそれがあるため
 - GitHub Pages: 無料・pushで反映され、Git練習と公開が自然につながる
 - Live Server: `file://` 直開きはセキュリティ制限でJSがエラーになるため（`'file:' URLs are treated as unique security origins`）
 - CSS変数: `:root` の値だけでライト／ダークを切り替えられる
@@ -56,7 +61,7 @@
 - MVPに月カレンダーを含める: 日付計算・月送り・マス描画で単体テーマ級の重さ。MVP完成後の第3弾に回した（実装済み）
 - MVPにグラフを含める: 外部ライブラリの学習が必要。第2弾に回した（実装済み）
 - セット数を1つの数値で持つ設計: 実際のトレは「1セット目60kg×10、2セット目55kg×8」と別々。sets配列に変更
-- リポジトリをPrivate化: 無料プランではPrivateリポジトリのGitHub Pages公開が不可。公開はコードのみで記録データは各端末のlocalStorageに閉じるため、Publicのまま運用
+- リポジトリをPrivate化: 無料プランではPrivateリポジトリのGitHub Pages公開が不可。公開されるのはコードのみ。記録データは Firestore のセキュリティルールで本人以外読めないため、Publicのまま運用（`firebaseConfig` は公開してよい情報。VAPID秘密鍵はコミットしない）
 - 本人がコードを手で書き、Claudeは提示と行番号案内のみ（〜2026-09-30）: 本人の指示により、Claudeが実装とgit操作まで行う方式に変更
 - Googleログイン: iPhoneのホーム画面PWAではポップアップの結果がアプリに戻らない報告が多く、画面遷移方式はGitHub Pagesでは同一ドメインのログイン用ファイルを置けないため
 - メールリンクでのログイン: リンクがSafariで開き、ホーム画面PWA側がログイン状態にならない
@@ -68,20 +73,18 @@
 
 ## 次のアクション
 
-- Firestore移行（進行中。ステップ1〜2完了）
-  3. 保存・読み込みを localStorage から Firestore に切り替え（オフライン機能を有効にする）
-  4. 初回ログイン時に localStorage の記録を Firestore へ引っ越し（事前に「書き出す」でバックアップ）
-  5. iPhoneで確認（保存・開き直し・圏外）。確認後に `auth-test.html` を削除
 - 未実装機能
   - 前回記録との比較表示
+  - フレンドの記録閲覧（Firestore とログインは導入済み。フレンド関係のデータ設計とセキュリティルールの追加が必要）
+- Firebase の小さな課題（急ぎではない）
+  - 新規登録はだれでもできる状態。必要になったら制限を検討
+  - Firebase SDK のバージョンを上げるときは script.js の `FIREBASE_URL` と sw.js の `ASSETS` の両方を変え、`CACHE_NAME` を上げる
 - 通知の小さな課題（急ぎではない）
   - アプリを開いたまま0秒になると、音と通知が重なることがある
   - iPhoneは `navigator.vibrate` 非対応で振動しない。マナーモードで音が鳴らない可能性あり（未確認）
 - 第3弾（大きなステップアップ）
-  - ユーザーアカウント + フレンドの記録閲覧
-  - 必要なもの: サーバー＋DB、ログイン認証、フレンド関係の管理
-  - localStorageは端末・ブラウザごとに閉じるため、全端末同期・他人の記録閲覧にはバックエンドが前提
-  - 候補: Firebase から入る。Cloudflareを導入済みのため、Cloudflareのサービスで揃える案も比較する（未調査）
+  - ユーザーアカウント: 完了（Firebase Authentication + Firestore）
+  - 残り: フレンドの記録閲覧。フレンド関係のデータ設計と、フレンドにだけ読ませるセキュリティルールの追加が必要
 - Git運用の次の練習: ブランチを切って修正 → マージ（branch / merge）
 
 ## 作業再開時の手順
