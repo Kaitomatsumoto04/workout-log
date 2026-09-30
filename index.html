@@ -50,6 +50,15 @@
         <li>2026-07-17 胸 ベンチプレス 60kg×10, 55kg×8</li>
         <li>2026-07-15 背中 懸垂 自重×8×3</li>
       </ul>
+
+      <!-- バックアップ：記録をファイルに書き出す／ファイルから読み込む -->
+      <h2>バックアップ</h2>
+      <div class="home-buttons">
+        <button id="export-data" class="ghost-button">書き出す</button>
+        <button id="import-data" class="ghost-button">読み込む</button>
+      </div>
+      <!-- ファイル選択は見た目を変えられないので隠し、「読み込む」ボタンから開く -->
+      <input type="file" id="import-file" accept=".json,application/json" hidden>
     </section>
 
     <!-- ② 記録する画面 -->

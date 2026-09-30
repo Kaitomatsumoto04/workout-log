@@ -495,6 +495,92 @@ document.getElementById("save-record").addEventListener("click", function () {
 // ===== 起動時：保存済みの履歴を表示 =====
 renderHistory();
 
+// ===== バックアップ（記録をファイルに書き出す／読み込む） =====
+
+// 書き出す：記録と種目リストを1つのJSONファイルにまとめる
+document.getElementById("export-data").addEventListener("click", async function () {
+  const backup = {
+    app: "workout-log", // このアプリのバックアップだと見分ける印
+    version: 1,         // 将来、形式を変えたときに見分けるための番号
+    exportedAt: new Date().toISOString(),
+    records: records,
+    master: exerciseMaster
+  };
+  const json = JSON.stringify(backup, null, 2); // 人が読めるよう改行と字下げを入れる
+
+  const today = new Date();
+  const fileName = "workout-log-" +
+    formatDate(today.getFullYear(), today.getMonth(), today.getDate()) + ".json";
+  const file = new File([json], fileName, { type: "application/json" });
+
+  // スマホ：共有シートを開く（iPhoneは「"ファイル"に保存」で保存できる）
+  if (navigator.maxTouchPoints > 0 && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] });
+    } catch (error) {
+      if (error.name !== "AbortError") { // 共有シートを閉じただけなら何もしない
+        alert("書き出しに失敗しました");
+      }
+    }
+    return;
+  }
+
+  // PC：ファイルとしてダウンロードする
+  const url = URL.createObjectURL(file); // ファイルを指す一時的なURLを作る
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  setTimeout(function () {
+    URL.revokeObjectURL(url); // 一時的なURLを片付ける（ダウンロード開始を待ってから）
+  }, 1000);
+});
+
+// 読み込むボタン：隠してあるファイル選択を開く
+document.getElementById("import-data").addEventListener("click", function () {
+  document.getElementById("import-file").click();
+});
+
+// ファイルが選ばれたら中身を確認して、今の記録と置き換える
+document.getElementById("import-file").addEventListener("change", async function (event) {
+  const file = event.target.files[0];
+  event.target.value = ""; // 同じファイルをもう一度選んでも反応するよう空にしておく
+  if (!file) {
+    return;
+  }
+
+  let backup;
+  try {
+    backup = JSON.parse(await file.text());
+  } catch (error) {
+    alert("ファイルを読み込めませんでした（JSONの形になっていません）");
+    return;
+  }
+  if (backup.app !== "workout-log" || !Array.isArray(backup.records)) {
+    alert("このアプリのバックアップファイルではありません");
+    return;
+  }
+
+  // 今の記録は消えて置き換わるので、必ず確認する
+  const ok = confirm(
+    backup.records.length + "件の記録を読み込みます。\n" +
+    "今の記録（" + records.length + "件）は置き換わります。よろしいですか？"
+  );
+  if (!ok) {
+    return;
+  }
+
+  records = backup.records;
+  saveRecords();
+  if (backup.master) {
+    exerciseMaster = backup.master;
+    saveMaster();
+  }
+  renderHistory();
+  renderCalendar();
+  alert("読み込みました");
+});
+
 // ===== 振り返る画面（グラフ） =====
 
 // 振り返り画面の部位が変わったら、種目リストを更新
