@@ -3,7 +3,7 @@
 // ファイルをキャッシュ（端末に保存）しておく係。
 // ※ ファイルを変えたときは CACHE_NAME の数字を上げる（古いキャッシュを捨てるため）
 
-const CACHE_NAME = "workout-log-v2";
+const CACHE_NAME = "workout-log-v3";
 
 // 最初に保存しておくファイル一覧
 const ASSETS = [
@@ -14,8 +14,15 @@ const ASSETS = [
   "./manifest.json",
   "./icon-192.png",
   "./icon-512.png",
-  "https://cdn.jsdelivr.net/npm/chart.js@4"
+  "https://cdn.jsdelivr.net/npm/chart.js@4",
+  "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js",
+  "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js",
+  "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js"
 ];
+
+// キャッシュしてよい外部サイト（ライブラリの配布元）
+// Firestore やログインの通信はキャッシュすると壊れるので、ここに入れない
+const CACHEABLE_HOSTS = ["cdn.jsdelivr.net", "www.gstatic.com"];
 
 // インストール時：一覧のファイルをまとめてキャッシュする
 self.addEventListener("install", function (event) {
@@ -50,6 +57,12 @@ self.addEventListener("fetch", function (event) {
 
   // GET以外と http(s) 以外は普通に通す
   if (request.method !== "GET" || !request.url.startsWith("http")) {
+    return;
+  }
+
+  // このアプリのファイルと、ライブラリの配布元以外は普通に通す
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin && !CACHEABLE_HOSTS.includes(url.hostname)) {
     return;
   }
 

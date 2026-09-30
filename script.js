@@ -49,22 +49,30 @@ const defaultMaster = {
   "HIIT": ["バーピー", "マウンテンクライマー", "縄跳び", "サーキット"]
 };
 
-// 保存済みがあればそれを、無ければ初期リストを使う
-let exerciseMaster = JSON.parse(localStorage.getItem("workout-master")) || defaultMaster;
+// 初期リストのコピーを作る関数
+// （コピーせずに使うと、種目を追加したとき初期リストそのものが書き換わってしまうため）
+function copyDefaultMaster() {
+  return JSON.parse(JSON.stringify(defaultMaster));
+}
 
-// 種目マスタを保存する関数
+// 種目リスト。ログインするとアカウントに保存されたもの（Firestore）に置き換わる
+let exerciseMaster = copyDefaultMaster();
+
+// 種目マスタをアカウント（Firestore）に保存する関数
+// ※ 中身はログインの部分で定義している saveMasterToCloud にまかせる
 function saveMaster() {
-  localStorage.setItem("workout-master", JSON.stringify(exerciseMaster));
+  saveMasterToCloud();
 }
 
 // 後から増やした部位は保存済みマスタに入っていないので、初期リストで補う
 // （これが無いと、追加した部位を選んだとき種目リストが取れずエラーになる）
-Object.keys(defaultMaster).forEach(function (part) {
-  if (exerciseMaster[part] === undefined) {
-    exerciseMaster[part] = defaultMaster[part];
-  }
-});
-saveMaster();
+function fillMissingParts() {
+  Object.keys(defaultMaster).forEach(function (part) {
+    if (exerciseMaster[part] === undefined) {
+      exerciseMaster[part] = defaultMaster[part].slice(); // slice() で配列をコピー
+    }
+  });
+}
 
 // ===== 部位ごとの入力タイプ =====
 
@@ -284,8 +292,8 @@ function startEdit(id) {
 
 // ===== 記録の保存・読み込み・表示 =====
 
-// 記録データの配列。起動時に localStorage から読み込む（無ければ空配列）
-let records = JSON.parse(localStorage.getItem("workout-records")) || [];
+// 記録データの配列。ログインすると、アカウント（Firestore）の記録がここに入る
+let records = [];
 
 // セットの中身を表示用の文字列にする関数
 // 例) 60kg×10, 55kg×8 ／ 5km ／ 20分
@@ -299,11 +307,6 @@ function formatSets(sets) {
     }
     return s.weight + "kg×" + s.reps;
   }).join(", ");
-}
-
-// 配列を localStorage に保存する関数
-function saveRecords() {
-  localStorage.setItem("workout-records", JSON.stringify(records));
 }
 
 // 履歴一覧を画面に描き直す関数
@@ -398,7 +401,7 @@ function deleteRecord(id) {
     resetRecordForm();
   }
 
-  saveRecords();
+  deleteRecordFromCloud(id);
   renderHistory();
   renderCalendar(); // その日の最後の記録を消したらカレンダーの色も消す
 }
@@ -453,32 +456,26 @@ document.getElementById("save-record").addEventListener("click", function () {
   // 編集モードかどうかを先に覚えておく（あとでリセットすると消えるため）
   const isEdit = editingId !== null;
 
+  const record = {
+    // 編集ならidは変えない。新規は今の時刻を区別用の番号に（削除・編集で使う）
+    id: isEdit ? editingId : Date.now(),
+    date: date,
+    part: part,
+    exercise: exercise,
+    sets: sets
+  };
+
   if (isEdit) {
     // 編集モード：同じidの記録を上書きする（並び順は変えない）
     records = records.map(function (r) {
-      if (r.id !== editingId) {
-        return r;
-      }
-      return {
-        id: editingId,  // idは変えない
-        date: date,
-        part: part,
-        exercise: exercise,
-        sets: sets
-      };
+      return r.id === editingId ? record : r;
     });
   } else {
-    // 新規：記録オブジェクトを作って配列に追加
-    records.push({
-      id: Date.now(),   // 今の時刻を区別用の番号に（削除・編集で使う）
-      date: date,
-      part: part,
-      exercise: exercise,
-      sets: sets
-    });
+    // 新規：配列に追加
+    records.push(record);
   }
 
-  saveRecords();
+  saveRecordToCloud(record);
   renderHistory();
   renderCalendar();
   resetRecordForm(); // 次の種目をすぐ入力できるようフォームを初期化
@@ -570,10 +567,11 @@ document.getElementById("import-file").addEventListener("change", async function
     return;
   }
 
+  replaceAllRecordsInCloud(backup.records); // アカウントの記録も丸ごと置き換える
   records = backup.records;
-  saveRecords();
   if (backup.master) {
     exerciseMaster = backup.master;
+    fillMissingParts();
     saveMaster();
   }
   renderHistory();
@@ -1138,8 +1136,10 @@ async function startFirebase() {
   try {
     const appLib = await import(FIREBASE_URL + "firebase-app.js");
     authLib = await import(FIREBASE_URL + "firebase-auth.js");
+    fsLib = await import(FIREBASE_URL + "firebase-firestore.js");
     const app = appLib.initializeApp(firebaseConfig);
     auth = authLib.getAuth(app);
+    db = createFirestore(app);
   } catch (error) {
     console.log("Firebaseの読み込みに失敗:", error);
     showScreen("screen-login");
@@ -1154,8 +1154,10 @@ async function startFirebase() {
       document.getElementById("account-email").textContent = user.email + " でログイン中";
       document.getElementById("login-password").value = ""; // パスワードを画面に残さない
       showLoginMessage("");
+      startSync();
       showScreen("screen-home");
     } else {
+      stopSync();
       showScreen("screen-login");
     }
   });
@@ -1215,5 +1217,204 @@ document.getElementById("logout-button").addEventListener("click", function () {
     authLib.signOut(auth); // 成功すると onAuthStateChanged が呼ばれ、ログイン画面に切り替わる
   }
 });
+
+// ===== 記録の保存先（Firestore） =====
+// データの形： users/{ユーザーID} … 種目リスト（master）
+//              users/{ユーザーID}/records/{記録ID} … 記録1件ずつ
+
+let fsLib = null;              // Firestore の関数をまとめたもの
+let db = null;                 // このアプリのデータベース係
+let unsubscribeRecords = null; // 記録の見張りをやめる関数（見張っていないときは null）
+let unsubscribeMaster = null;  // 種目リストの見張りをやめる関数
+
+// Firestore を用意する
+// 端末の中にもコピーを持たせる（圏外でも読み書きでき、電波が戻ると自動で送られる）
+function createFirestore(app) {
+  try {
+    return fsLib.initializeFirestore(app, {
+      localCache: fsLib.persistentLocalCache({
+        tabManager: fsLib.persistentMultipleTabManager() // タブを複数開いても壊れないように
+      })
+    });
+  } catch (error) {
+    console.log("端末へのコピーが使えないため、通常モードで動かします:", error);
+    return fsLib.getFirestore(app);
+  }
+}
+
+// 保存場所（パス）を作る関数
+function userDoc() {
+  return fsLib.doc(db, "users", currentUser.uid);
+}
+function recordsCollection() {
+  return fsLib.collection(db, "users", currentUser.uid, "records");
+}
+function recordDoc(id) {
+  return fsLib.doc(db, "users", currentUser.uid, "records", String(id)); // 記録IDは文字列にする
+}
+
+// 保存に失敗したときの共通処理
+// （圏外は失敗ではなく「電波が戻ったら送る」扱いになるので、ここには来ない）
+function showCloudError(error) {
+  console.log("Firestoreとのやりとりに失敗:", error);
+  alert("保存に失敗しました（" + error.code + "）");
+}
+
+// 記録1件を保存する（新規・編集のどちらも）
+// ※ await しない：圏外だと電波が戻るまで完了しないため。画面は先に更新してよい
+function saveRecordToCloud(record) {
+  if (currentUser === null) {
+    return;
+  }
+  fsLib.setDoc(recordDoc(record.id), record).catch(showCloudError);
+}
+
+// 記録1件を削除する
+function deleteRecordFromCloud(id) {
+  if (currentUser === null) {
+    return;
+  }
+  fsLib.deleteDoc(recordDoc(id)).catch(showCloudError);
+}
+
+// 種目リストを保存する（丸ごと上書き）
+function saveMasterToCloud() {
+  if (currentUser === null) {
+    return;
+  }
+  fsLib.setDoc(userDoc(), { master: exerciseMaster }).catch(showCloudError);
+}
+
+// たくさんの書き込みを、まとめて送る（1回のまとめ送りは500件までなので分ける）
+async function commitInBatches(operations) {
+  for (let i = 0; i < operations.length; i += 500) {
+    const batch = fsLib.writeBatch(db);
+    operations.slice(i, i + 500).forEach(function (op) {
+      if (op.data) {
+        // merge: true なら、書いた項目だけ更新する（ほかの項目は残す）
+        batch.set(op.ref, op.data, { merge: op.merge === true });
+      } else {
+        batch.delete(op.ref);
+      }
+    });
+    await batch.commit();
+  }
+}
+
+// バックアップの読み込み用：アカウントの記録を丸ごと置き換える
+function replaceAllRecordsInCloud(newRecords) {
+  const newIds = newRecords.map(function (r) {
+    return r.id;
+  });
+  const operations = [];
+  // 今あってバックアップに無い記録は消す
+  records.forEach(function (r) {
+    if (!newIds.includes(r.id)) {
+      operations.push({ ref: recordDoc(r.id) });
+    }
+  });
+  // バックアップの記録はすべて書き込む
+  newRecords.forEach(function (r) {
+    operations.push({ ref: recordDoc(r.id), data: r });
+  });
+  commitInBatches(operations).catch(showCloudError);
+}
+
+// ログインしたら、アカウントのデータの見張りを始める
+function startSync() {
+  stopWatching(); // 念のため、前の見張りが残っていたら止める
+
+  // 種目リスト：変わるたびに受け取る
+  unsubscribeMaster = fsLib.onSnapshot(userDoc(), function (snapshot) {
+    const data = snapshot.data();
+    exerciseMaster = (data && data.master) ? data.master : copyDefaultMaster();
+    fillMissingParts();
+  }, showCloudError);
+
+  // 記録：変わるたびに全件受け取って描き直す（ほかの端末で記録しても反映される）
+  unsubscribeRecords = fsLib.onSnapshot(recordsCollection(), function (snapshot) {
+    records = snapshot.docs.map(function (d) {
+      return d.data();
+    });
+    // 記録した順（id＝記録した時刻）に並べる。今までの配列と同じ並びにするため
+    records.sort(function (a, b) {
+      return a.id - b.id;
+    });
+    renderHistory();
+    renderCalendar();
+  }, showCloudError);
+
+  migrateLocalData();
+}
+
+// 見張りを止める
+function stopWatching() {
+  if (unsubscribeRecords !== null) {
+    unsubscribeRecords();
+    unsubscribeRecords = null;
+  }
+  if (unsubscribeMaster !== null) {
+    unsubscribeMaster();
+    unsubscribeMaster = null;
+  }
+}
+
+// ログアウトしたら、見張りを止めて画面の記録も消す（次の人に見えないように）
+function stopSync() {
+  stopWatching();
+  records = [];
+  exerciseMaster = copyDefaultMaster();
+  renderHistory();
+  renderCalendar();
+}
+
+// この端末（localStorage）に残っている以前の記録を、アカウントへ引っ越す
+// ・端末とアカウントの組み合わせごとに1回だけ行う
+// ・同じ記録IDは上書きになるだけなので、途中で失敗して何度やり直しても二重にならない
+// ・localStorage の記録は消さずに残しておく（万一のときの予備）
+async function migrateLocalData() {
+  const doneKey = "workout-migrated-" + currentUser.uid;
+  if (localStorage.getItem(doneKey) !== null) {
+    return; // 引っ越し済み
+  }
+
+  const localRecords = JSON.parse(localStorage.getItem("workout-records")) || [];
+  const localMaster = JSON.parse(localStorage.getItem("workout-master"));
+  if (localRecords.length === 0 && localMaster === null) {
+    localStorage.setItem(doneKey, "done"); // 引っ越すものが無い
+    return;
+  }
+
+  const ok = confirm(
+    "この端末に保存されている記録（" + localRecords.length + "件）を、アカウントに引っ越しますか？\n" +
+    "（キャンセルすると、次に開いたときにもう一度聞きます）"
+  );
+  if (!ok) {
+    return;
+  }
+
+  const operations = localRecords.map(function (r) {
+    return { ref: recordDoc(r.id), data: r };
+  });
+
+  // 種目リストは、アカウント側と合体させる（arrayUnion：無い種目だけ追加する）
+  if (localMaster !== null) {
+    const masterUpdate = {};
+    Object.keys(localMaster).forEach(function (part) {
+      if (localMaster[part].length > 0) {
+        masterUpdate[part] = fsLib.arrayUnion(...localMaster[part]); // ... で配列をばらして渡す
+      }
+    });
+    operations.push({ ref: userDoc(), data: { master: masterUpdate }, merge: true });
+  }
+
+  try {
+    await commitInBatches(operations); // 圏外なら、電波が戻って送り終わるまで待つ
+    localStorage.setItem(doneKey, "done");
+    alert("引っ越しが終わりました（" + localRecords.length + "件）");
+  } catch (error) {
+    showCloudError(error);
+  }
+}
 
 startFirebase();
