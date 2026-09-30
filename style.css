@@ -330,3 +330,11 @@ button:active { opacity: 0.75; transform: scale(0.985); }
   color: var(--secondary);
   margin-top: 10px;
 }
+
+/* ログイン画面・アカウント欄のメッセージ */
+#login-message,
+#account-email {
+  font-size: 15px;
+  color: var(--secondary);
+  margin: 10px 0;
+}

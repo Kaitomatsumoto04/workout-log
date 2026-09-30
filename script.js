@@ -1087,3 +1087,133 @@ if ("serviceWorker" in navigator) {
     });
   });
 }
+
+// ===== ログイン（Firebase Authentication） =====
+
+// Firebase の接続情報（公開してよい情報。データはセキュリティルールで守る）
+const firebaseConfig = {
+  apiKey: "AIzaSyDhwYqlfAa5TF-wpPar3Q2IRNBWyvukDEU",
+  authDomain: "workout-log-87f89.firebaseapp.com",
+  projectId: "workout-log-87f89",
+  storageBucket: "workout-log-87f89.firebasestorage.app",
+  messagingSenderId: "806015456461",
+  appId: "1:806015456461:web:5227bb67c7e59d85488584"
+};
+const FIREBASE_URL = "https://www.gstatic.com/firebasejs/12.19.0/";
+
+let authLib = null;     // Firebase のログイン関係の関数をまとめたもの
+let auth = null;        // このアプリのログイン係
+let currentUser = null; // ログイン中のユーザー。ログアウト中は null
+
+// エラーコードを日本語のメッセージに置き換える表
+const AUTH_ERROR_MESSAGES = {
+  "auth/invalid-email": "メールアドレスの形が正しくありません",
+  "auth/missing-password": "パスワードを入力してください",
+  "auth/invalid-credential": "メールアドレスかパスワードが違います",
+  "auth/email-already-in-use": "このメールアドレスはすでに登録されています",
+  "auth/weak-password": "パスワードは6文字以上にしてください",
+  "auth/too-many-requests": "失敗が続いたため一時的に止められています。しばらく待ってから試してください",
+  "auth/network-request-failed": "通信できませんでした。電波の状況を確認してください"
+};
+
+function showLoginMessage(text) {
+  document.getElementById("login-message").textContent = text;
+}
+
+// 表に無いエラーは、コードをそのまま出す（原因を調べられるように）
+function showAuthError(error) {
+  showLoginMessage(AUTH_ERROR_MESSAGES[error.code] || "エラーが起きました（" + error.code + "）");
+}
+
+function getLoginInputs() {
+  return {
+    email: document.getElementById("login-email").value.trim(), // 前後の余計なスペースを取る
+    password: document.getElementById("login-password").value
+  };
+}
+
+// Firebase を読み込んで、ログイン状態の見張りを始める
+// （script.js は type="module" ではないので、import() であとから読み込む）
+async function startFirebase() {
+  try {
+    const appLib = await import(FIREBASE_URL + "firebase-app.js");
+    authLib = await import(FIREBASE_URL + "firebase-auth.js");
+    const app = appLib.initializeApp(firebaseConfig);
+    auth = authLib.getAuth(app);
+  } catch (error) {
+    console.log("Firebaseの読み込みに失敗:", error);
+    showScreen("screen-login");
+    showLoginMessage("読み込みに失敗しました。電波の状況を確認して、開き直してください");
+    return;
+  }
+
+  // ログイン状態が変わるたびに呼ばれる（起動時の自動ログインも、ここで分かる）
+  authLib.onAuthStateChanged(auth, function (user) {
+    currentUser = user;
+    if (user) {
+      document.getElementById("account-email").textContent = user.email + " でログイン中";
+      document.getElementById("login-password").value = ""; // パスワードを画面に残さない
+      showLoginMessage("");
+      showScreen("screen-home");
+    } else {
+      showScreen("screen-login");
+    }
+  });
+}
+
+// ログイン
+document.getElementById("login-button").addEventListener("click", async function () {
+  if (auth === null) {
+    return; // まだ Firebase を読み込めていない
+  }
+  const input = getLoginInputs();
+  showLoginMessage("ログインしています…");
+  try {
+    await authLib.signInWithEmailAndPassword(auth, input.email, input.password);
+    // 成功すると onAuthStateChanged が呼ばれ、ホームに切り替わる
+  } catch (error) {
+    showAuthError(error);
+  }
+});
+
+// 新規登録（登録できると、そのままログインした状態になる）
+document.getElementById("signup-button").addEventListener("click", async function () {
+  if (auth === null) {
+    return;
+  }
+  const input = getLoginInputs();
+  showLoginMessage("登録しています…");
+  try {
+    await authLib.createUserWithEmailAndPassword(auth, input.email, input.password);
+  } catch (error) {
+    showAuthError(error);
+  }
+});
+
+// パスワード再設定のメールを送る
+document.getElementById("reset-password").addEventListener("click", async function () {
+  if (auth === null) {
+    return;
+  }
+  const input = getLoginInputs();
+  if (input.email === "") {
+    showLoginMessage("先にメールアドレスを入力してください");
+    return;
+  }
+  try {
+    await authLib.sendPasswordResetEmail(auth, input.email);
+    // 登録されていないアドレスでもエラーにならない（他人が登録の有無を調べられないようにするため）
+    showLoginMessage("登録されていれば、パスワード再設定のメールを送りました（迷惑メールフォルダも確認してください）");
+  } catch (error) {
+    showAuthError(error);
+  }
+});
+
+// ログアウト
+document.getElementById("logout-button").addEventListener("click", function () {
+  if (confirm("ログアウトしますか？")) {
+    authLib.signOut(auth); // 成功すると onAuthStateChanged が呼ばれ、ログイン画面に切り替わる
+  }
+});
+
+startFirebase();
