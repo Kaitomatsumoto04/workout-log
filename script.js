@@ -357,41 +357,45 @@ function renderHistory() {
 
     // その日の記録を1件ずつ
     groups[date].forEach(function (record) {
-      const setsText = formatSets(record.sets);
-
-      const row = document.createElement("div");
-      row.className = "history-row";
-
-      const span = document.createElement("span");
-      span.textContent = record.part + " " + record.exercise + " " + setsText;
-
-      const editBtn = document.createElement("button");
-      editBtn.textContent = "編集";
-      editBtn.className = "edit-button";
-      editBtn.addEventListener("click", function () {
-        startEdit(record.id);
-      });
-
-      const delBtn = document.createElement("button");
-      delBtn.textContent = "削除";
-      delBtn.className = "delete-button";
-      delBtn.addEventListener("click", function () {
-        deleteRecord(record.id);
-      });
-
-      // ボタン2つは横並びでまとめる
-      const actions = document.createElement("div");
-      actions.className = "history-actions";
-      actions.appendChild(editBtn);
-      actions.appendChild(delBtn);
-
-      row.appendChild(span);
-      row.appendChild(actions);
-      li.appendChild(row);
+      li.appendChild(createHistoryRow(record));
     });
 
     list.appendChild(li);
   });
+}
+
+// 記録1件分の行（内容＋編集・削除ボタン）を作る関数
+// （ホームの履歴と、カレンダーの日付詳細の2か所で使う）
+function createHistoryRow(record) {
+  const row = document.createElement("div");
+  row.className = "history-row";
+
+  const span = document.createElement("span");
+  span.textContent = record.part + " " + record.exercise + " " + formatSets(record.sets);
+
+  const editBtn = document.createElement("button");
+  editBtn.textContent = "編集";
+  editBtn.className = "edit-button";
+  editBtn.addEventListener("click", function () {
+    startEdit(record.id);
+  });
+
+  const delBtn = document.createElement("button");
+  delBtn.textContent = "削除";
+  delBtn.className = "delete-button";
+  delBtn.addEventListener("click", function () {
+    deleteRecord(record.id);
+  });
+
+  // ボタン2つは横並びでまとめる
+  const actions = document.createElement("div");
+  actions.className = "history-actions";
+  actions.appendChild(editBtn);
+  actions.appendChild(delBtn);
+
+  row.appendChild(span);
+  row.appendChild(actions);
+  return row;
 }
 
 // 指定idの記録を削除する関数
@@ -1016,7 +1020,10 @@ function renderCalendar() {
   // 見出し（例：2026年7月）
   title.textContent = currentYear + "年" + (currentMonth + 1) + "月";
 
-  // 描き直すと選択中の枠線が消えるので、覚えている日付も未選択に戻す
+  // 描き直す前に選んでいた日付を覚えておく
+  // （削除や同期で描き直したときも、同じ月なら選んだまま・詳細も最新にするため）
+  const previousSelected = selectedDate;
+  let selectedCell = null;
   selectedDate = "";
 
   // その月の日数（翌月の0日目＝今月の最終日）
@@ -1054,7 +1061,18 @@ function renderCalendar() {
       showDayDetail(dateStr, cell);
     });
 
+    if (dateStr === previousSelected) {
+      selectedCell = cell;
+    }
+
     daysArea.appendChild(cell);
+  }
+
+  // 選んでいた日がこの月にあれば選び直して詳細を最新にする。無ければ詳細を消す
+  if (selectedCell !== null) {
+    showDayDetail(previousSelected, selectedCell);
+  } else {
+    document.getElementById("day-detail").textContent = "";
   }
 }
 
@@ -1079,15 +1097,16 @@ function showDayDetail(dateStr, cell) {
     return;
   }
 
-  // その日の記録を文章にする
-  let text = dateStr + "\n";
-  dayRecords.forEach(function (r) {
-    const setsText = formatSets(r.sets);
-    text += "・" + r.part + " " + r.exercise + " " + setsText + "\n";
-  });
+  // 日付の見出し＋その日の記録（ホームの履歴と同じく、編集・削除ボタン付き）
+  detail.innerHTML = "";
+  const dateHead = document.createElement("div");
+  dateHead.className = "history-date";
+  dateHead.textContent = dateStr;
+  detail.appendChild(dateHead);
 
-  detail.textContent = text;
-  detail.style.whiteSpace = "pre-line"; // 改行を反映させる
+  dayRecords.forEach(function (record) {
+    detail.appendChild(createHistoryRow(record));
+  });
 }
 
 // 前月・翌月ボタン
