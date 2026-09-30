@@ -3,7 +3,7 @@
 // ファイルをキャッシュ（端末に保存）しておく係。
 // ※ ファイルを変えたときは CACHE_NAME の数字を上げる（古いキャッシュを捨てるため）
 
-const CACHE_NAME = "workout-log-v1";
+const CACHE_NAME = "workout-log-v2";
 
 // 最初に保存しておくファイル一覧
 const ASSETS = [
@@ -68,6 +68,32 @@ self.addEventListener("fetch", function (event) {
       return caches.match(request).then(function (cached) {
         return cached || caches.match("./index.html");
       });
+    })
+  );
+});
+
+// サーバーから通知が届いたとき：通知を表示する
+// （iPhoneでは、届いたのに通知を出さないと購読を取り消されることがあるので、必ず表示する）
+self.addEventListener("push", function (event) {
+  const data = event.data ? event.data.json() : {};
+  event.waitUntil(
+    self.registration.showNotification(data.title || "インターバル終了", {
+      body: data.body || "",
+      icon: "./icon-192.png",
+      tag: "interval-timer" // 同じtagの通知は上書きされ、溜まらない
+    })
+  );
+});
+
+// 通知をタップしたとき：開いているアプリを前に出す（開いていなければ開く）
+self.addEventListener("notificationclick", function (event) {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {
+      if (clientList.length > 0) {
+        return clientList[0].focus();
+      }
+      return self.clients.openWindow("./");
     })
   );
 });

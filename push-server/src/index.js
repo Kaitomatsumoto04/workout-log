@@ -4,7 +4,8 @@ import webpush from "web-push";
 // リクエストを受け付けてよいサイト（公開ページと Live Server）
 const ALLOWED_ORIGINS = [
   "https://kaitomatsumoto04.github.io",
-  "http://127.0.0.1:5500"
+  "http://127.0.0.1:5500",
+  "http://127.0.0.1:5501"
 ];
 
 // ===== タイマー係（端末1台につき1つ作られる Durable Object） =====

@@ -799,6 +799,7 @@ function stopTimer() {
   if (timerId !== null) {
     clearInterval(timerId); // 動いているタイマーを止める
     timerId = null;
+    sendToPushServer("/cancel", {}); // サーバーの予約も取り消す
   }
   document.getElementById("timer-start").textContent = "スタート";
 }
@@ -903,11 +904,16 @@ document.querySelectorAll(".preset-button").forEach(function (button) {
 });
 
 // スタート／一時停止ボタン
-document.getElementById("timer-start").addEventListener("click", function () {
+document.getElementById("timer-start").addEventListener("click", async function () {
   prepareAudio(); // 押された瞬間に音の準備をしておく
 
   if (timerId === null) {
     startTimer();
+    await preparePush(); // 初回だけ、ここで通知の許可ダイアログが出る
+    if (timerId !== null) {
+      // 許可を待つ間に止められていなければ、終了時刻をサーバーに予約する
+      sendToPushServer("/start", { endTime: timerEndTime });
+    }
   } else {
     stopTimer(); // 動いている最中に押されたら一時停止
   }
@@ -922,6 +928,67 @@ document.getElementById("timer-reset").addEventListener("click", function () {
 
 // 起動時に表示を合わせる
 updateTimerDisplay();
+
+// ===== プッシュ通知（ほかのアプリを使っていてもインターバル終了を知らせる） =====
+
+const PUSH_SERVER_URL = "https://push-server.kinntore.workers.dev"; // 公開したら Cloudflare のURLに変える
+const VAPID_PUBLIC_KEY = "BMWDkGKxCuBbEfCfyVpq03uJZX8Mi7ivEtvOers1aZ5kiEjFBy4XGp8U6Xq6o4fwNCfq_7uf_29U2DaDpS4QBJM";
+
+let pushSubscription = null; // 通知の宛先（購読情報）。用意できていないときは null
+
+// 公開鍵の文字列を、ブラウザが受け取れる形（バイトの並び）に変換する
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) {
+    bytes[i] = raw.charCodeAt(i);
+  }
+  return bytes;
+}
+
+// 通知の許可をもらい、宛先を用意する。スタートボタンを押した瞬間に呼ぶ
+// （iPhoneは許可のダイアログをユーザー操作のときしか出せないため）
+async function preparePush() {
+  if (!("Notification" in window) || !("PushManager" in window)) {
+    return; // 対応していない環境（iPhoneはホーム画面から開いたときだけ対応）
+  }
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      return;
+    }
+    const registration = await navigator.serviceWorker.ready;
+    // すでに購読していればそれを使い、無ければ新しく購読する
+    let subscription = await registration.pushManager.getSubscription();
+    if (subscription === null) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true, // 「届いたら必ず通知を表示する」という約束（無いと購読できない）
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+    pushSubscription = subscription;
+  } catch (error) {
+    console.log("通知の準備に失敗:", error);
+  }
+}
+
+// 通知サーバーに送る（/start で予約、/cancel で取り消し）
+function sendToPushServer(path, data) {
+  if (pushSubscription === null) {
+    return; // 宛先が無ければ何もしない（音と画面だけで知らせる）
+  }
+  data.subscription = pushSubscription;
+  fetch(PUSH_SERVER_URL + path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  }).catch(function (error) {
+    console.log("通知サーバーへの送信に失敗:", error);
+  });
+}
+
 
 // ===== PWA（ホーム画面に追加してアプリのように起動する） =====
 
