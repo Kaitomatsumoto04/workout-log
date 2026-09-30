@@ -5,7 +5,10 @@
 import { jwtVerify, importX509 } from "jose";
 
 const FIREBASE_PROJECT_ID = "workout-log-87f89";
-const GEMINI_MODEL = "gemini-3.5-flash"; // 無料枠で使えるモデル。変えるときはここだけ直す
+// 無料枠で使えるモデルを、使いたい順に並べる。
+// 混み合っている（503）・回数制限（429）のときは、次のモデルに切り替えて頼み直す
+// （回数制限はモデルごとに別なので、別のモデルなら使えることが多い）
+const GEMINI_MODELS = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash"];
 
 // アプリの部位と同じ並び。Gemini にはこの中からしか部位を選ばせない
 const PARTS = ["胸", "背中", "腹筋", "腕", "下半身", "ランニング", "HIIT"];
@@ -142,8 +145,21 @@ function buildPrompt(data) {
   return prompt.length <= 30000 ? prompt : null;
 }
 
+// モデルを順番に試す。どれかが答えてくれたらそれを返す
 async function askGemini(prompt, apiKey) {
-  const url = "https://generativelanguage.googleapis.com/v1beta/models/" + GEMINI_MODEL + ":generateContent";
+  let result = { status: 502 };
+  for (const model of GEMINI_MODELS) {
+    result = await askGeminiModel(model, prompt, apiKey);
+    // 成功、または混雑・回数制限以外の失敗（キーが無効など）なら、ほかのモデルでも同じなのでやめる
+    if (result.status !== 503 && result.status !== 429) {
+      return result;
+    }
+  }
+  return result; // 全部のモデルが混雑・回数制限だった
+}
+
+async function askGeminiModel(model, prompt, apiKey) {
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent";
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -161,8 +177,12 @@ async function askGemini(prompt, apiKey) {
   });
 
   if (!response.ok) {
-    console.log("Gemini エラー:", response.status, await response.text());
-    return { status: response.status === 429 ? 429 : 502 }; // 429 は回数制限
+    console.log("Gemini エラー（" + model + "）:", response.status, await response.text());
+    // 429 は回数制限、503 は混雑。それ以外はまとめて 502（Gemini 側の失敗）としてアプリに返す
+    if (response.status === 429 || response.status === 503) {
+      return { status: response.status };
+    }
+    return { status: 502 };
   }
 
   const result = await response.json();

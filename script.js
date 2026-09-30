@@ -602,7 +602,8 @@ const MENU_ERROR_MESSAGES = {
   400: "条件の送り方に問題がありました",
   401: "ログインの確認に失敗しました。ログインし直してください",
   429: "Gemini の利用回数の上限に達しました。時間をおいて試してください",
-  502: "Gemini から返事をもらえませんでした。もう一度試してください"
+  502: "Gemini から返事をもらえませんでした。もう一度試してください",
+  503: "Gemini が混み合っています。少し時間をおいて試してください"
 };
 
 document.getElementById("go-menu").addEventListener("click", function () {
