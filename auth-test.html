@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- ホーム画面に追加したとき、Safariの枠なしでアプリのように開く -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>ログインテスト</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; padding: 24px; background: #000; color: #fff; }
+    input, button { display: block; width: 100%; margin: 8px 0; padding: 12px; font-size: 16px; } /* 16px未満だとiPhoneが勝手に拡大する */
+  </style>
+</head>
+<body>
+  <h1>ログインテスト</h1>
+  <p id="status">確認中…</p>
+
+  <input id="email" type="email" placeholder="メールアドレス" autocomplete="username">
+  <input id="password" type="password" placeholder="パスワード（6文字以上）" autocomplete="current-password">
+  <button id="signup">新規登録</button>
+  <button id="login">ログイン</button>
+  <button id="logout">ログアウト</button>
+
+  <!-- type="module"：import でFirebaseの部品を読み込むために必要 -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+    import {
+      getAuth,
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
+      signOut,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+
+    // A-4 で表示された内容をそのまま貼る
+    const firebaseConfig = {
+      apiKey: "AIzaSyDhwYqlfAa5TF-wpPar3Q2IRNBWyvukDEU",
+      authDomain: "workout-log-87f89.firebaseapp.com",
+      projectId: "workout-log-87f89",
+      storageBucket: "workout-log-87f89.firebasestorage.app",
+      messagingSenderId: "806015456461",
+      appId: "1:806015456461:web:5227bb67c7e59d85488584"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const status = document.getElementById("status");
+
+    function getInputs() {
+      return {
+        email: document.getElementById("email").value,
+        password: document.getElementById("password").value
+      };
+    }
+
+    // うまくいかなかったとき、原因のコード（例: auth/wrong-password）を表示する
+    function showError(error) {
+      status.textContent = "エラー: " + error.code;
+    }
+
+    document.getElementById("signup").addEventListener("click", async function () {
+      const input = getInputs();
+      try {
+        await createUserWithEmailAndPassword(auth, input.email, input.password);
+      } catch (error) {
+        showError(error);
+      }
+    });
+
+    document.getElementById("login").addEventListener("click", async function () {
+      const input = getInputs();
+      try {
+        await signInWithEmailAndPassword(auth, input.email, input.password);
+      } catch (error) {
+        showError(error);
+      }
+    });
+
+    document.getElementById("logout").addEventListener("click", function () {
+      signOut(auth);
+    });
+
+    // ログイン状態が変わるたびに呼ばれる（アプリを開き直したときも、ここで自動ログインが分かる）
+    onAuthStateChanged(auth, function (user) {
+      if (user) {
+        status.textContent = "ログイン中: " + user.email;
+      } else {
+        status.textContent = "ログアウト中";
+      }
+    });
+  </script>
+</body>
+</html>
