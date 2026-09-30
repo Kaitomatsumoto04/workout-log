@@ -13,7 +13,7 @@ const GEMINI_MODELS = ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.5-flash
 const RETRY_STATUSES = [404, 429, 503, "retry"]; // 次のモデルで頼み直す失敗
 
 // アプリの部位と同じ並び。Gemini にはこの中からしか部位を選ばせない
-const PARTS = ["胸", "背中", "腹筋", "腕", "下半身", "ランニング", "HIIT"];
+const PARTS = ["胸", "背中", "肩", "腹筋", "腕", "下半身", "ランニング", "HIIT"];
 const PLACES = ["ジム", "自宅（ダンベルあり）", "自宅（自重のみ）", "屋外"];
 
 // ----- ログインの確認（Firebase の IDトークンを検証する） -----
