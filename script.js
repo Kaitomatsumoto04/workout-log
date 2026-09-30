@@ -28,6 +28,7 @@ document.getElementById("back-home-1").addEventListener("click", function () {
   if (editingId !== null) {
     resetRecordForm();
   }
+  menuItemInProgress = null; // メニュー提案から来ていても、記録をやめたのでメニューには戻らない
   showScreen("screen-home");
 });
 
@@ -247,7 +248,18 @@ function startEdit(id) {
   }
 
   editingId = id;
+  fillRecordForm(record);
 
+  // 編集中だと分かるように見出しとボタンの文字を変える
+  document.getElementById("record-heading").textContent = "記録を編集";
+  document.getElementById("save-record").textContent = "更新する";
+
+  showScreen("screen-record");
+}
+
+// 記録画面の入力欄に、記録の内容（日付・部位・種目・セット）を入れる関数
+// （記録の編集と、メニュー提案からの記録の2か所で使う）
+function fillRecordForm(record) {
   // 日付・部位を入れる
   document.getElementById("input-date").value = record.date;
   document.getElementById("input-part").value = record.part;
@@ -282,12 +294,6 @@ function startEdit(id) {
     setsArea.appendChild(row);
   });
   updateSetsHeading(type);
-
-  // 編集中だと分かるように見出しとボタンの文字を変える
-  document.getElementById("record-heading").textContent = "記録を編集";
-  document.getElementById("save-record").textContent = "更新する";
-
-  showScreen("screen-record");
 }
 
 // ===== 記録の保存・読み込み・表示 =====
@@ -483,6 +489,12 @@ document.getElementById("save-record").addEventListener("click", function () {
   if (isEdit) {
     alert("更新しました");
     showScreen("screen-home"); // 編集は1件で終わりなのでホームへ戻る
+  } else if (menuItemInProgress !== null) {
+    // メニュー提案から来たときは、記録済みの印を付けてメニュー画面に戻る
+    addToMasterIfMissing(record.part, record.exercise);
+    markMenuItemDone();
+    alert("記録しました");
+    showScreen("screen-menu");
   } else {
     // 続けて次の種目を記録できるよう、ホームには戻らず記録画面のままにする
     alert("記録しました");
@@ -578,6 +590,183 @@ document.getElementById("import-file").addEventListener("change", async function
   renderCalendar();
   alert("読み込みました");
 });
+
+// ===== 今日のメニュー提案（Gemini） =====
+// 条件と直近の記録を通知サーバー（Cloudflare）に送り、サーバーが Gemini に考えてもらう。
+// Gemini の APIキーはサーバーにだけ置いてある（アプリのコードは公開されているため）
+
+let menuRequesting = false;     // 問い合わせ中は二重に押せないようにする
+let menuItemInProgress = null;  // メニューから記録画面を開いた種目の「記録する」ボタン。無ければ null
+
+const MENU_ERROR_MESSAGES = {
+  400: "条件の送り方に問題がありました",
+  401: "ログインの確認に失敗しました。ログインし直してください",
+  429: "Gemini の利用回数の上限に達しました。時間をおいて試してください",
+  502: "Gemini から返事をもらえませんでした。もう一度試してください"
+};
+
+document.getElementById("go-menu").addEventListener("click", function () {
+  showScreen("screen-menu");
+});
+
+document.getElementById("back-home-3").addEventListener("click", function () {
+  showScreen("screen-home");
+});
+
+function setMenuMessage(text) {
+  document.getElementById("menu-message").textContent = text;
+}
+
+// 直近2週間の記録を、送るのに必要な項目だけにして集める
+function getRecentRecords() {
+  const from = new Date();
+  from.setDate(from.getDate() - 14);
+  const fromStr = formatDate(from.getFullYear(), from.getMonth(), from.getDate());
+  return records.filter(function (r) {
+    return r.date >= fromStr; // "YYYY-MM-DD" は文字列のまま大小比較できる
+  }).map(function (r) {
+    return { date: r.date, part: r.part, exercise: r.exercise, sets: r.sets };
+  });
+}
+
+// Gemini のセットを、部位の入力タイプに合った形にそろえる
+// （関係ない項目が入っていたり、数字でなかったりしても表示・記録が壊れないように）
+function cleanSets(item) {
+  const type = getInputType(item.part);
+  return (item.sets || []).map(function (s) {
+    if (type === "distance") {
+      return { distance: Number(s.distance) || 0 };
+    }
+    if (type === "time") {
+      return { minutes: Number(s.minutes) || 0 };
+    }
+    return { weight: Number(s.weight) || 0, reps: Number(s.reps) || 0 };
+  });
+}
+
+document.getElementById("menu-generate").addEventListener("click", async function () {
+  if (menuRequesting || currentUser === null) {
+    return;
+  }
+  const button = this;
+  menuRequesting = true;
+  button.disabled = true;
+  setMenuMessage("考えています…（数秒〜数十秒かかります）");
+  document.getElementById("menu-result").innerHTML = "";
+
+  try {
+    // ログインしている証明（IDトークン）を付けて送る。サーバーはこれで本人か確かめる
+    const token = await currentUser.getIdToken();
+    const response = await fetch(PUSH_SERVER_URL + "/menu", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
+      },
+      body: JSON.stringify({
+        part: document.getElementById("menu-part").value,
+        minutes: Number(document.getElementById("menu-minutes").value),
+        place: document.getElementById("menu-place").value,
+        recentRecords: getRecentRecords(),
+        master: exerciseMaster
+      })
+    });
+
+    if (!response.ok) {
+      setMenuMessage(MENU_ERROR_MESSAGES[response.status] || "うまく考えられませんでした（" + response.status + "）");
+      return;
+    }
+    const menu = await response.json();
+    setMenuMessage("");
+    renderMenu(menu);
+  } catch (error) {
+    console.log("メニューの取得に失敗:", error);
+    setMenuMessage("通信できませんでした。電波の状況を確認してください");
+  } finally {
+    menuRequesting = false;
+    button.disabled = false;
+  }
+});
+
+// 提案されたメニューを表示する
+// ※ Gemini の返事は何が入っているか分からないので、innerHTML ではなく textContent で入れる
+function renderMenu(menu) {
+  const area = document.getElementById("menu-result");
+  area.innerHTML = "";
+
+  const title = document.createElement("h3");
+  title.textContent = menu.title || "今日のメニュー";
+  area.appendChild(title);
+
+  (menu.items || []).forEach(function (item) {
+    const sets = cleanSets(item);
+
+    const card = document.createElement("div");
+    card.className = "menu-item";
+
+    const name = document.createElement("div");
+    name.className = "menu-item-name";
+    name.textContent = item.part + "｜" + item.exercise;
+
+    const detail = document.createElement("div");
+    detail.className = "menu-item-sets";
+    detail.textContent = formatSets(sets) + "（休憩" + (Number(item.restSeconds) || 0) + "秒）";
+
+    const point = document.createElement("div");
+    point.className = "menu-item-point";
+    point.textContent = item.point || "";
+
+    const recordButton = document.createElement("button");
+    recordButton.className = "sub-button";
+    recordButton.textContent = "この種目を記録する";
+    recordButton.addEventListener("click", function () {
+      recordFromMenu(item, sets, recordButton);
+    });
+
+    card.appendChild(name);
+    card.appendChild(detail);
+    card.appendChild(point);
+    card.appendChild(recordButton);
+    area.appendChild(card);
+  });
+
+  if (menu.advice) {
+    const advice = document.createElement("p");
+    advice.className = "menu-note";
+    advice.textContent = menu.advice;
+    area.appendChild(advice);
+  }
+}
+
+// メニューの種目を、提案の内容が入った状態で記録画面に開く
+// （実際にやった重量・回数に直してから「記録する」を押してもらう）
+function recordFromMenu(item, sets, recordButton) {
+  resetRecordForm(); // 編集中だったら取りやめる
+  const today = new Date();
+  fillRecordForm({
+    date: formatDate(today.getFullYear(), today.getMonth(), today.getDate()),
+    part: item.part,
+    exercise: item.exercise,
+    sets: sets
+  });
+  menuItemInProgress = recordButton;
+  showScreen("screen-record");
+}
+
+// 記録し終わった種目のボタンを「記録済み」にする
+function markMenuItemDone() {
+  menuItemInProgress.textContent = "✓ 記録済み";
+  menuItemInProgress.disabled = true;
+  menuItemInProgress = null;
+}
+
+// 提案された種目が種目リストに無ければ追加する（次からプルダウンで選べるように）
+function addToMasterIfMissing(part, exercise) {
+  if (exerciseMaster[part] !== undefined && !exerciseMaster[part].includes(exercise)) {
+    exerciseMaster[part].push(exercise);
+    saveMaster();
+  }
+}
 
 // ===== 振り返る画面（グラフ） =====
 

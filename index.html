@@ -60,6 +60,7 @@
         <button id="go-record">記録する</button>
         <button id="go-review">振り返る</button>
       </div>
+      <button id="go-menu" class="sub-button">✦ 今日のメニューを考えてもらう</button>
       <h2>直近の履歴</h2>
       <ul id="history-list">
         <!-- ここに記録がJSで差し込まれる（今は見本を仮置き） -->
@@ -175,6 +176,50 @@
       <canvas id="chart"></canvas>
 
       <button id="back-home-2" class="ghost-button">ホームに戻る</button>
+    </section>
+
+    <!-- ④ メニュー提案画面：条件を選ぶと、Gemini が今日のメニューを考える -->
+    <section id="screen-menu" class="screen">
+      <h2>メニューを考える</h2>
+
+      <label>鍛えたい部位
+        <select id="menu-part">
+          <option value="おまかせ">おまかせ（最近やっていない部位を優先）</option>
+          <option value="胸">胸</option>
+          <option value="背中">背中</option>
+          <option value="腹筋">腹筋</option>
+          <option value="腕">腕</option>
+          <option value="下半身">下半身</option>
+          <option value="ランニング">ランニング</option>
+          <option value="HIIT">HIIT</option>
+        </select>
+      </label>
+
+      <label>使える時間
+        <select id="menu-minutes">
+          <option value="30">30分</option>
+          <option value="45">45分</option>
+          <option value="60" selected>60分</option>
+          <option value="90">90分</option>
+        </select>
+      </label>
+
+      <label>場所・器具
+        <select id="menu-place">
+          <option value="ジム">ジム</option>
+          <option value="自宅（ダンベルあり）">自宅（ダンベルあり）</option>
+          <option value="自宅（自重のみ）">自宅（自重のみ）</option>
+          <option value="屋外">屋外</option>
+        </select>
+      </label>
+
+      <p class="menu-note">直近2週間の記録（種目・重量・回数）を Google の Gemini に送って考えてもらいます。メールアドレスなどは送りません。</p>
+      <button id="menu-generate">考えてもらう</button>
+      <p id="menu-message"></p>
+      <!-- ここに提案されたメニューがJSで差し込まれる -->
+      <div id="menu-result"></div>
+
+      <button id="back-home-3" class="ghost-button">ホームに戻る</button>
     </section>
   </main>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>

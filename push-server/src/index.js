@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import webpush from "web-push";
+import { handleMenu } from "./menu.js";
 
 // リクエストを受け付けてよいサイト（公開ページと Live Server）
 const ALLOWED_ORIGINS = [
@@ -59,7 +60,7 @@ function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type"
+    "Access-Control-Allow-Headers": "Content-Type, Authorization"
   };
 }
 
@@ -79,6 +80,13 @@ export default {
       return new Response("Method Not Allowed", { status: 405, headers });
     }
 
+    const path = new URL(request.url).pathname;
+
+    // 筋トレメニューの提案（Gemini）は別のファイルで処理する
+    if (path === "/menu") {
+      return handleMenu(request, env, headers);
+    }
+
     const data = await request.json();
     if (!data.subscription || !data.subscription.endpoint) {
       return new Response("Bad Request", { status: 400, headers });
@@ -86,7 +94,6 @@ export default {
 
     // endpoint（端末ごとに違うURL）を名前にして、その端末専用のタイマー係を呼び出す
     const timer = env.TIMER.getByName(data.subscription.endpoint);
-    const path = new URL(request.url).pathname;
 
     if (path === "/start") {
       if (typeof data.endTime !== "number") {
