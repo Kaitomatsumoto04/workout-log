@@ -8,7 +8,7 @@ const FIREBASE_PROJECT_ID = "workout-log-87f89";
 // 無料枠で使えるモデルを、使いたい順に並べる。
 // 混み合っている（503）・回数制限（429）のときは、次のモデルに切り替えて頼み直す
 // （回数制限はモデルごとに別なので、別のモデルなら使えることが多い）
-const GEMINI_MODELS = ["gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-2.5-flash"];
+const GEMINI_MODELS = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-3.5-flash-lite"];
 
 // アプリの部位と同じ並び。Gemini にはこの中からしか部位を選ばせない
 const PARTS = ["胸", "背中", "腹筋", "腕", "下半身", "ランニング", "HIIT"];
@@ -82,11 +82,13 @@ const MENU_SCHEMA = {
             items: {
               type: "OBJECT",
               properties: {
-                weight: { type: "NUMBER", description: "重量kg。自重なら0" },
-                reps: { type: "INTEGER", description: "回数" },
-                distance: { type: "NUMBER", description: "ランニングの距離km" },
-                minutes: { type: "NUMBER", description: "HIITの時間（分）" }
-              }
+                weight: { type: "NUMBER", description: "重量kg（2.5kg刻み）。自重・ランニング・HIITは0" },
+                reps: { type: "INTEGER", description: "回数（1以上）。ランニング・HIITは0" },
+                distance: { type: "NUMBER", description: "ランニングの距離km。それ以外は0" },
+                minutes: { type: "NUMBER", description: "HIITの時間（分）。それ以外は0" }
+              },
+              // 全項目を必須にする（任意にすると、モデルが回数などを省くことがあるため）
+              required: ["weight", "reps", "distance", "minutes"]
             }
           },
           restSeconds: { type: "INTEGER", description: "セット間の休憩（秒）" },
@@ -106,7 +108,9 @@ const SYSTEM_INSTRUCTION = [
   "- 合計時間（休憩を含む）が、指定された時間に収まるようにする。",
   "- 部位が「おまかせ」のときは、直近の記録で間が空いている部位を優先する。",
   "- 場所・器具で実施できない種目は入れない。",
-  "- 重量は直近の記録を参考に、同じ種目があればその重量の前後にする。記録が無い種目は控えめな重量にする。",
+  "- 種目数は時間に合わせる（目安: 30分なら3〜4種目、45分なら4〜5種目、60分なら5〜6種目、90分なら7〜8種目）。",
+  "- 筋トレ種目は各3〜4セット。1セットずつ sets に入れ、回数は必ず1以上にする。",
+  "- 重量は直近の記録を参考に、同じ種目があればその重量の前後にする。記録が無い種目は控えめな重量にする。重量は2.5kg刻み、自重種目は0。",
   "- 種目名は、種目リストにある名前をできるだけそのまま使う。",
   "- 部位が「ランニング」の種目は sets に distance（km）だけ、「HIIT」は minutes（分）だけ、それ以外は weight と reps を入れる。",
   "- 安全を最優先し、無理な重量や回数は提案しない。医学的な診断や助言はしない。"
@@ -145,17 +149,58 @@ function buildPrompt(data) {
   return prompt.length <= 30000 ? prompt : null;
 }
 
-// モデルを順番に試す。どれかが答えてくれたらそれを返す
+// モデルを順番に試す。どれかがちゃんと答えてくれたらそれを返す
 async function askGemini(prompt, apiKey) {
   let result = { status: 502 };
   for (const model of GEMINI_MODELS) {
     result = await askGeminiModel(model, prompt, apiKey);
-    // 成功、または混雑・回数制限以外の失敗（キーが無効など）なら、ほかのモデルでも同じなのでやめる
-    if (result.status !== 503 && result.status !== 429) {
+    if (result.status === 200) {
+      return result;
+    }
+    // 混雑（503）・回数制限（429）・使えない返事（retry）なら次のモデルへ。
+    // それ以外の失敗（キーが無効など）は、ほかのモデルでも同じなのでやめる
+    if (result.status !== 503 && result.status !== 429 && result.status !== "retry") {
       return result;
     }
   }
-  return result; // 全部のモデルが混雑・回数制限だった
+  // 全部だめだった。使えない返事だったときは 502 としてアプリに返す
+  return { status: result.status === "retry" ? 502 : result.status };
+}
+
+// 小数を決まった刻みに丸める（例: 40.00000186 → 40）。step は 0.5 や 0.1
+function roundTo(value, step) {
+  const k = 1 / step;
+  return Math.round((Number(value) || 0) * k) / k;
+}
+
+// Gemini の返事を、アプリで使える形に整える
+// ・部位に合った項目だけ残し、数字を丸める ・回数や距離が0のセット、セットが無い種目は捨てる
+function normalizeMenu(menu) {
+  const items = (Array.isArray(menu.items) ? menu.items : []).filter(function (item) {
+    return PARTS.includes(item.part) && typeof item.exercise === "string" && item.exercise !== "";
+  }).map(function (item) {
+    const sets = (Array.isArray(item.sets) ? item.sets : []).map(function (s) {
+      if (item.part === "ランニング") {
+        return { distance: roundTo(s.distance, 0.1) };
+      }
+      if (item.part === "HIIT") {
+        return { minutes: roundTo(s.minutes, 1) };
+      }
+      return { weight: roundTo(s.weight, 0.5), reps: Math.round(Number(s.reps) || 0) };
+    }).filter(function (s) {
+      return (s.reps || s.distance || s.minutes) > 0;
+    });
+    return {
+      part: item.part,
+      exercise: item.exercise,
+      sets: sets,
+      restSeconds: Math.round(Number(item.restSeconds) || 0),
+      point: String(item.point || "")
+    };
+  }).filter(function (item) {
+    return item.sets.length > 0;
+  });
+  return { title: String(menu.title || ""), items: items, advice: String(menu.advice || "") };
 }
 
 async function askGeminiModel(model, prompt, apiKey) {
@@ -187,12 +232,19 @@ async function askGeminiModel(model, prompt, apiKey) {
 
   const result = await response.json();
   const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+  let menu;
   try {
-    return { status: 200, menu: JSON.parse(text) };
+    menu = normalizeMenu(JSON.parse(text));
   } catch (error) {
-    console.log("Gemini の返事が JSON になっていない:", text);
-    return { status: 502 };
+    console.log("Gemini の返事が JSON になっていない（" + model + "）:", text);
+    return { status: "retry" };
   }
+  if (menu.items.length === 0) {
+    console.log("Gemini の返事に使える種目が無い（" + model + "）:", text);
+    return { status: "retry" };
+  }
+  console.log("メニューを作成（" + model + "）: " + menu.items.length + "種目");
+  return { status: 200, menu: menu };
 }
 
 // ----- /menu の受付 -----
