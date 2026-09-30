@@ -6,9 +6,11 @@ import { jwtVerify, importX509 } from "jose";
 
 const FIREBASE_PROJECT_ID = "workout-log-87f89";
 // 無料枠で使えるモデルを、使いたい順に並べる。
-// 混み合っている（503）・回数制限（429）のときは、次のモデルに切り替えて頼み直す
+// 混み合っている（503）・回数制限（429）・提供終了（404）のときは、次のモデルに切り替えて頼み直す
 // （回数制限はモデルごとに別なので、別のモデルなら使えることが多い）
-const GEMINI_MODELS = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-3.5-flash-lite"];
+// ※ gemini-2.5-flash は新しい利用者には提供終了（404）だったため外した（2026-09-30）
+const GEMINI_MODELS = ["gemini-3.5-flash", "gemini-3.8-flash", "gemini-3.5-flash-lite"];
+const RETRY_STATUSES = [404, 429, 503, "retry"]; // 次のモデルで頼み直す失敗
 
 // アプリの部位と同じ並び。Gemini にはこの中からしか部位を選ばせない
 const PARTS = ["胸", "背中", "腹筋", "腕", "下半身", "ランニング", "HIIT"];
@@ -167,14 +169,14 @@ async function askGemini(prompt, apiKey) {
     if (result.status === 200) {
       return result;
     }
-    // 混雑（503）・回数制限（429）・使えない返事（retry）なら次のモデルへ。
+    // 混雑・回数制限・提供終了・使えない返事なら次のモデルへ。
     // それ以外の失敗（キーが無効など）は、ほかのモデルでも同じなのでやめる
-    if (result.status !== 503 && result.status !== 429 && result.status !== "retry") {
+    if (!RETRY_STATUSES.includes(result.status)) {
       return result;
     }
   }
-  // 全部だめだった。使えない返事だったときは 502 としてアプリに返す
-  return { status: result.status === "retry" ? 502 : result.status };
+  // 全部だめだった。混雑・回数制限はそのまま、それ以外は 502 としてアプリに返す
+  return { status: result.status === 503 || result.status === 429 ? result.status : 502 };
 }
 
 // 小数を決まった刻みに丸める（例: 40.00000186 → 40）。step は 0.5 や 0.1
@@ -238,8 +240,8 @@ async function askGeminiModel(model, prompt, apiKey) {
 
   if (!response.ok) {
     console.log("Gemini エラー（" + model + "）:", response.status, await response.text());
-    // 429 は回数制限、503 は混雑。それ以外はまとめて 502（Gemini 側の失敗）としてアプリに返す
-    if (response.status === 429 || response.status === 503) {
+    // 429 は回数制限、503 は混雑、404 はモデルの提供終了。それ以外はまとめて 502（Gemini 側の失敗）
+    if (response.status === 429 || response.status === 503 || response.status === 404) {
       return { status: response.status };
     }
     return { status: 502 };
