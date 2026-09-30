@@ -591,22 +591,24 @@ document.getElementById("import-file").addEventListener("change", async function
   alert("読み込みました");
 });
 
-// ===== 今日のメニュー提案（Gemini） =====
+// ===== AIトレーナー（Gemini） =====
 // 条件と直近の記録を通知サーバー（Cloudflare）に送り、サーバーが Gemini に考えてもらう。
 // Gemini の APIキーはサーバーにだけ置いてある（アプリのコードは公開されているため）
 
 let menuRequesting = false;     // 問い合わせ中は二重に押せないようにする
 let menuItemInProgress = null;  // メニューから記録画面を開いた種目の「記録する」ボタン。無ければ null
 
+// うまくいかなかったときの、トレーナーの返事
 const MENU_ERROR_MESSAGES = {
-  400: "条件の送り方に問題がありました",
-  401: "ログインの確認に失敗しました。ログインし直してください",
-  429: "Gemini の利用回数の上限に達しました。時間をおいて試してください",
-  502: "Gemini から返事をもらえませんでした。もう一度試してください",
-  503: "Gemini が混み合っています。少し時間をおいて試してください"
+  400: "ごめんなさい、条件がうまく受け取れませんでした。選び直してもう一度お願いします。",
+  401: "あなたの確認ができませんでした。一度ログアウトして、ログインし直してもらえますか？",
+  429: "今日はたくさん相談してもらったので、少し休憩させてください。時間をおいてまた声をかけてくださいね。",
+  502: "ごめんなさい、うまくメニューがまとまりませんでした。もう一度お願いできますか？",
+  503: "今ちょっと混み合っているみたいです。少し待ってから、もう一度声をかけてください！"
 };
 
 document.getElementById("go-menu").addEventListener("click", function () {
+  document.getElementById("trainer-greeting").textContent = makeGreeting();
   showScreen("screen-menu");
 });
 
@@ -614,8 +616,64 @@ document.getElementById("back-home-3").addEventListener("click", function () {
   showScreen("screen-home");
 });
 
-function setMenuMessage(text) {
-  document.getElementById("menu-message").textContent = text;
+// 今日の日付 "YYYY-MM-DD"
+function todayString() {
+  const today = new Date();
+  return formatDate(today.getFullYear(), today.getMonth(), today.getDate());
+}
+
+// 画面を開いたときの声かけ。最後に記録した日と部位を見て変える
+function makeGreeting() {
+  if (records.length === 0) {
+    return "はじめまして！あなた専属のAIトレーナーです。今日の条件を教えてもらえれば、メニューを組み立てますよ。";
+  }
+  // 一番新しい日付の記録を探す
+  const last = records.reduce(function (a, b) {
+    return b.date > a.date ? b : a;
+  });
+  // 日付の差を日数にする（1日 = 86400000ミリ秒）
+  const days = Math.round((new Date(todayString()) - new Date(last.date)) / 86400000);
+  if (days <= 0) {
+    return "今日はもう" + last.part + "をやったんですね、ナイスです！続きのメニューも考えましょうか？";
+  }
+  if (days === 1) {
+    return "お疲れさまです！昨日は" + last.part + "でしたね。今日はどうしましょう？";
+  }
+  if (days >= 7) {
+    return "おかえりなさい！前回から" + days + "日ぶりですね。無理なく再開できるメニューを組みましょう。";
+  }
+  return "お疲れさまです！前回（" + days + "日前）は" + last.part + "でしたね。今日はどうしましょう？";
+}
+
+// トレーナーの吹き出しを1つ作る。typing が true なら「…」が動く考え中の表示にする
+function createTrainerBubble(text, typing) {
+  const row = document.createElement("div");
+  row.className = "trainer-row";
+
+  const avatar = document.createElement("div");
+  avatar.className = "trainer-avatar";
+  avatar.textContent = "AI";
+
+  const bubble = document.createElement("div");
+  bubble.className = "trainer-bubble";
+  bubble.textContent = text;
+  if (typing) {
+    const dots = document.createElement("span");
+    dots.className = "typing-dots";
+    dots.innerHTML = "<span></span><span></span><span></span>"; // 中身は固定の空要素だけなので安全
+    bubble.appendChild(dots);
+  }
+
+  row.appendChild(avatar);
+  row.appendChild(bubble);
+  return row;
+}
+
+// メニュー欄を、トレーナーのひと言だけにする（考え中・うまくいかなかったとき）
+function showTrainerSays(text, typing) {
+  const area = document.getElementById("menu-result");
+  area.innerHTML = "";
+  area.appendChild(createTrainerBubble(text, typing));
 }
 
 // 直近2週間の記録を、送るのに必要な項目だけにして集める
@@ -652,8 +710,8 @@ document.getElementById("menu-generate").addEventListener("click", async functio
   const button = this;
   menuRequesting = true;
   button.disabled = true;
-  setMenuMessage("考えています…（数秒〜数十秒かかります）");
-  document.getElementById("menu-result").innerHTML = "";
+  showTrainerSays("記録を見ながらメニューを考えています", true);
+  document.getElementById("menu-result").scrollIntoView({ behavior: "smooth", block: "start" });
 
   try {
     // ログインしている証明（IDトークン）を付けて送る。サーバーはこれで本人か確かめる
@@ -674,78 +732,115 @@ document.getElementById("menu-generate").addEventListener("click", async functio
     });
 
     if (!response.ok) {
-      setMenuMessage(MENU_ERROR_MESSAGES[response.status] || "うまく考えられませんでした（" + response.status + "）");
+      showTrainerSays(MENU_ERROR_MESSAGES[response.status] ||
+        "ごめんなさい、うまくいきませんでした（" + response.status + "）。もう一度お願いします。");
       return;
     }
-    const menu = await response.json();
-    setMenuMessage("");
-    renderMenu(menu);
+    renderMenu(await response.json());
   } catch (error) {
     console.log("メニューの取得に失敗:", error);
-    setMenuMessage("通信できませんでした。電波の状況を確認してください");
+    showTrainerSays("通信できませんでした。電波の良いところで、もう一度声をかけてください。");
   } finally {
     menuRequesting = false;
     button.disabled = false;
   }
 });
 
-// 提案されたメニューを表示する
+// 提案されたメニューを、トレーナーの声かけ → 種目カード → 締めの一言 の順に表示する
 // ※ Gemini の返事は何が入っているか分からないので、innerHTML ではなく textContent で入れる
 function renderMenu(menu) {
   const area = document.getElementById("menu-result");
   area.innerHTML = "";
 
+  if (menu.message) {
+    area.appendChild(createTrainerBubble(menu.message, false));
+  }
+
   const title = document.createElement("h3");
+  title.className = "menu-title";
   title.textContent = menu.title || "今日のメニュー";
   area.appendChild(title);
 
-  (menu.items || []).forEach(function (item) {
-    const sets = cleanSets(item);
-
-    const card = document.createElement("div");
-    card.className = "menu-item";
-
-    const name = document.createElement("div");
-    name.className = "menu-item-name";
-    name.textContent = item.part + "｜" + item.exercise;
-
-    const detail = document.createElement("div");
-    detail.className = "menu-item-sets";
-    detail.textContent = formatSets(sets) + "（休憩" + (Number(item.restSeconds) || 0) + "秒）";
-
-    const point = document.createElement("div");
-    point.className = "menu-item-point";
-    point.textContent = item.point || "";
-
-    const recordButton = document.createElement("button");
-    recordButton.className = "sub-button";
-    recordButton.textContent = "この種目を記録する";
-    recordButton.addEventListener("click", function () {
-      recordFromMenu(item, sets, recordButton);
-    });
-
-    card.appendChild(name);
-    card.appendChild(detail);
-    card.appendChild(point);
-    card.appendChild(recordButton);
-    area.appendChild(card);
+  (menu.items || []).forEach(function (item, index) {
+    area.appendChild(createMenuCard(item, index + 1));
   });
 
   if (menu.advice) {
-    const advice = document.createElement("p");
-    advice.className = "menu-note";
-    advice.textContent = menu.advice;
-    area.appendChild(advice);
+    area.appendChild(createTrainerBubble(menu.advice, false));
   }
+}
+
+// 種目1つ分のカードを作る
+function createMenuCard(item, number) {
+  const sets = cleanSets(item);
+
+  const card = document.createElement("div");
+  card.className = "menu-item";
+
+  // 見出し：番号・種目名・部位
+  const header = document.createElement("div");
+  header.className = "menu-item-header";
+  const badge = document.createElement("span");
+  badge.className = "menu-item-number";
+  badge.textContent = number;
+  const name = document.createElement("span");
+  name.className = "menu-item-name";
+  name.textContent = item.exercise;
+  const part = document.createElement("span");
+  part.className = "menu-item-part";
+  part.textContent = item.part;
+  header.appendChild(badge);
+  header.appendChild(name);
+  header.appendChild(part);
+  card.appendChild(header);
+
+  // セットを1行ずつ（例: 1. 60kg × 10回）
+  const list = document.createElement("ol");
+  list.className = "menu-item-sets";
+  sets.forEach(function (s) {
+    const li = document.createElement("li");
+    if (s.reps !== undefined) {
+      li.textContent = (s.weight > 0 ? s.weight + "kg × " : "自重 × ") + s.reps + "回";
+    } else {
+      li.textContent = formatSets([s]); // 距離（km）や時間（分）はいつもの表示
+    }
+    list.appendChild(li);
+  });
+  card.appendChild(list);
+
+  const rest = Number(item.restSeconds) || 0;
+  if (rest > 0) {
+    const restLine = document.createElement("div");
+    restLine.className = "menu-item-rest";
+    restLine.textContent = "セット間の休憩 " + rest + "秒";
+    card.appendChild(restLine);
+  }
+
+  // トレーナーからのワンポイント
+  if (item.point) {
+    const point = document.createElement("div");
+    point.className = "menu-item-point";
+    point.textContent = item.point;
+    card.appendChild(point);
+  }
+
+  const recordButton = document.createElement("button");
+  recordButton.className = "sub-button";
+  recordButton.textContent = "この種目を記録する";
+  recordButton.addEventListener("click", function () {
+    recordFromMenu(item, sets, recordButton);
+  });
+  card.appendChild(recordButton);
+
+  return card;
 }
 
 // メニューの種目を、提案の内容が入った状態で記録画面に開く
 // （実際にやった重量・回数に直してから「記録する」を押してもらう）
 function recordFromMenu(item, sets, recordButton) {
   resetRecordForm(); // 編集中だったら取りやめる
-  const today = new Date();
   fillRecordForm({
-    date: formatDate(today.getFullYear(), today.getMonth(), today.getDate()),
+    date: todayString(),
     part: item.part,
     exercise: item.exercise,
     sets: sets

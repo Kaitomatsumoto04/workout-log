@@ -69,6 +69,7 @@ async function verifyIdToken(token) {
 const MENU_SCHEMA = {
   type: "OBJECT",
   properties: {
+    message: { type: "STRING", description: "最初の声かけ。直近の記録に具体的に触れ、今日のメニューの狙いを伝える（2〜3文）" },
     title: { type: "STRING", description: "メニューの短いタイトル" },
     items: {
       type: "ARRAY",
@@ -92,19 +93,23 @@ const MENU_SCHEMA = {
             }
           },
           restSeconds: { type: "INTEGER", description: "セット間の休憩（秒）" },
-          point: { type: "STRING", description: "フォームや注意点を1文で" }
+          point: { type: "STRING", description: "トレーナーからのワンポイント。フォームのコツや意識する筋肉を話し言葉で1〜2文" }
         },
         required: ["part", "exercise", "sets", "restSeconds", "point"]
       }
     },
-    advice: { type: "STRING", description: "メニュー全体についての一言" }
+    advice: { type: "STRING", description: "締めの声かけ。休憩・栄養・次回への励ましなど（1〜2文）" }
   },
-  required: ["title", "items", "advice"]
+  required: ["message", "title", "items", "advice"]
 };
 
 const SYSTEM_INSTRUCTION = [
-  "あなたは経験豊富なパーソナルトレーナーです。利用者の条件と直近のトレーニング記録から、今日の筋トレメニューを日本語で提案してください。",
-  "ルール:",
+  "あなたは利用者専属の「AIトレーナー」です。明るく前向きで、頼りになるパーソナルトレーナーとして、利用者の条件と直近のトレーニング記録から今日のメニューを日本語で提案してください。",
+  "話し方:",
+  "- 利用者に直接話しかける、親しみやすい丁寧語（です・ます）。堅すぎず、なれなれしすぎない。",
+  "- 記録に具体的に触れてほめる・気づかせる（例: 前回より重量が上がった、しばらく間が空いている部位がある、同じ部位が続いている）。記録が無いときは、はじめての人への励ましにする。",
+  "- 根拠の無いほめ言葉や大げさな表現は使わない。絵文字は使わない。",
+  "メニューのルール:",
   "- 合計時間（休憩を含む）が、指定された時間に収まるようにする。",
   "- 部位が「おまかせ」のときは、直近の記録で間が空いている部位を優先する。",
   "- 場所・器具で実施できない種目は入れない。",
@@ -112,7 +117,7 @@ const SYSTEM_INSTRUCTION = [
   "- 筋トレ種目は各3〜4セット。1セットずつ sets に入れ、回数は必ず1以上にする。",
   "- 重量は直近の記録を参考に、同じ種目があればその重量の前後にする。記録が無い種目は控えめな重量にする。重量は2.5kg刻み、自重種目は0。",
   "- 種目名は、種目リストにある名前をできるだけそのまま使う。",
-  "- 部位が「ランニング」の種目は sets に distance（km）だけ、「HIIT」は minutes（分）だけ、それ以外は weight と reps を入れる。",
+  "- 部位が「ランニング」の種目は distance（km）、「HIIT」は minutes（分）、それ以外は weight と reps に値を入れ、関係ない項目は0にする。",
   "- 安全を最優先し、無理な重量や回数は提案しない。医学的な診断や助言はしない。"
 ].join("\n");
 
@@ -132,7 +137,12 @@ function buildPrompt(data) {
   });
   const master = typeof data.master === "object" && data.master !== null ? data.master : {};
 
+  // 日本時間の今日の日付（記録が何日前かを判断してもらうため）
+  const today = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
   const prompt = [
+    "今日の日付: " + today,
+    "",
     "【条件】",
     "鍛えたい部位: " + part,
     "使える時間: " + minutes + "分",
@@ -200,7 +210,12 @@ function normalizeMenu(menu) {
   }).filter(function (item) {
     return item.sets.length > 0;
   });
-  return { title: String(menu.title || ""), items: items, advice: String(menu.advice || "") };
+  return {
+    message: String(menu.message || ""),
+    title: String(menu.title || ""),
+    items: items,
+    advice: String(menu.advice || "")
+  };
 }
 
 async function askGeminiModel(model, prompt, apiKey) {

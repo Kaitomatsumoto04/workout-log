@@ -338,34 +338,127 @@ button:active { opacity: 0.75; transform: scale(0.985); }
   color: var(--secondary);
   margin: 10px 0;
 }
-/* ===== メニュー提案 ===== */
+/* ===== AIトレーナー ===== */
+/* 画面の背景（--card）の上に置くので、一段明るい面の色を使う */
+:root { --elevated: #2C2C2E; }
+
 .menu-note {
   font-size: 13px;
   color: var(--secondary);
   margin: 10px 0;
 }
 
-#menu-message {
-  font-size: 15px;
-  color: var(--secondary);
-  margin: 10px 0;
+/* トレーナーのアイコン＋吹き出し */
+.trainer-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 12px 0;
 }
+
+.trainer-avatar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--blue), #5E5CE6);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.trainer-bubble {
+  background: var(--elevated);
+  border-radius: 4px 16px 16px 16px; /* 左上だけ角ばらせて、アイコンから話している形に */
+  padding: 10px 14px;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+/* 考え中の「…」：3つの点が順番に上下する */
+.typing-dots { display: inline-flex; gap: 4px; margin-left: 6px; }
+.typing-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--secondary);
+  animation: typing 1.2s infinite ease-in-out;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typing {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+.menu-title { margin-top: 20px; }
 
 /* 種目1つ分のカード */
 .menu-item {
-  background: var(--card);
+  background: var(--elevated);
   border-radius: 12px;
-  padding: 12px 14px 4px;
+  padding: 14px 14px 2px;
   margin: 10px 0;
 }
 
-.menu-item-name { font-weight: 600; }
-.menu-item-sets { margin-top: 4px; }
+.menu-item-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
-.menu-item-point {
+/* 何番目の種目か */
+.menu-item-number {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-item-name { font-weight: 600; font-size: 17px; flex: 1; }
+
+/* 部位のタグ */
+.menu-item-part {
+  font-size: 12px;
+  color: var(--secondary);
+  border: 1px solid var(--separator);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* セット一覧（1. 60kg × 10回 …） */
+.menu-item-sets {
+  margin: 10px 0 0 34px; /* 番号の丸の幅だけ右にずらして、種目名とそろえる */
+  font-size: 15px;
+  line-height: 1.7;
+  font-variant-numeric: tabular-nums; /* 数字の幅をそろえて縦に読みやすく */
+}
+
+.menu-item-rest {
+  margin-left: 34px;
   font-size: 13px;
   color: var(--secondary);
-  margin-top: 4px;
+}
+
+/* トレーナーからのワンポイント */
+.menu-item-point {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--blue);
+  background: rgba(10, 132, 255, 0.08);
+  border-radius: 0 8px 8px 0;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 /* 押せない状態のボタン（問い合わせ中・記録済み） */

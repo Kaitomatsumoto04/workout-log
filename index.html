@@ -182,9 +182,15 @@
     <section id="screen-menu" class="screen">
       <h2>AIトレーナー</h2>
 
-      <label>鍛えたい部位
+      <!-- トレーナーからの声かけ（開くたびに、記録を見て文言を変える） -->
+      <div class="trainer-row">
+        <div class="trainer-avatar">AI</div>
+        <div class="trainer-bubble" id="trainer-greeting"></div>
+      </div>
+
+      <label>どこを鍛えたい？
         <select id="menu-part">
-          <option value="おまかせ">おまかせ（最近やっていない部位を優先）</option>
+          <option value="おまかせ">おまかせ</option>
           <option value="胸">胸</option>
           <option value="背中">背中</option>
           <option value="腹筋">腹筋</option>
@@ -195,7 +201,7 @@
         </select>
       </label>
 
-      <label>使える時間
+      <label>時間はどれくらいある？
         <select id="menu-minutes">
           <option value="30">30分</option>
           <option value="45">45分</option>
@@ -204,7 +210,7 @@
         </select>
       </label>
 
-      <label>場所・器具
+      <label>今日はどこでトレーニングする？
         <select id="menu-place">
           <option value="ジム">ジム</option>
           <option value="自宅（ダンベルあり）">自宅（ダンベルあり）</option>
@@ -213,10 +219,10 @@
         </select>
       </label>
 
+      <button id="menu-generate">メニューを組んでもらう</button>
       <p class="menu-note">直近2週間の記録（種目・重量・回数）を Google の Gemini に送って考えてもらいます。メールアドレスなどは送りません。</p>
-      <button id="menu-generate">考えてもらう</button>
-      <p id="menu-message"></p>
-      <!-- ここに提案されたメニューがJSで差し込まれる -->
+
+      <!-- ここにトレーナーの返事とメニューがJSで差し込まれる -->
       <div id="menu-result"></div>
 
       <button id="back-home-3" class="ghost-button">ホームに戻る</button>
